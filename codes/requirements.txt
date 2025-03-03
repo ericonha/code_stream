@@ -3,8 +3,5 @@ streamlit
 numpy
 pandas
 pdfkit
-datetime
+python-dateutil
 webcolors
-re
-datetime
-relativedelta
