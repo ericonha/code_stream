@@ -489,7 +489,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     try:
         # Generate the PDF from the HTML content using pdfkit
-        pdf_output = weasyprint.HTML(string=html_content).write_pdf()
+        pdf_output = pisa.CreatePDF(html_content, dest=open(file_name, "wb"))
 
         # Create a download button for the generated PDF
         st.download_button(
