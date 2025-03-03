@@ -1,0 +1,11 @@
+openpyxl==3.1.2
+streamlit
+numpy
+pandas
+pdfkit
+datetime
+webcolors
+math
+re
+datetime
+relativedelta
