@@ -5,7 +5,6 @@ pandas
 pdfkit
 datetime
 webcolors
-math
 re
 datetime
 relativedelta
