@@ -490,7 +490,18 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     try:
         # Generate the PDF from the HTML content using pdfkit
-        pdf_output = pisa.CreatePDF(html_content, dest=open(file_name, "wb"))
+        pdf_output = BytesIO()
+
+        # Use xhtml2pdf to generate the PDF
+        pisa_status = pisa.CreatePDF(html_content, dest=pdf_output)
+    
+        # Check if PDF creation was successful
+        if pisa_status.err:
+            st.error(f"Error generating the PDF: {pisa_status.err}")
+            return None
+        
+        # Reset the pointer to the beginning of the BytesIO object
+        pdf_output.seek(0)
 
         # Create a download button for the generated PDF
         st.download_button(
