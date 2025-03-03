@@ -488,6 +488,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     try:
         # Generate the PDF from the HTML content using pdfkit
+        config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
         pdf_output = pdfkit.from_string(html_content)
 
         # Create a download button for the generated PDF
