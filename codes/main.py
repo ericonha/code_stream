@@ -9,7 +9,8 @@ import AP
 import pdfkit
 import streamlit as st
 from datetime import datetime
-import weasyprint
+from xhtml2pdf import pisa
+
 
 def round_0_25(duration):
     duration = round_down_0_05(duration)
