@@ -39,7 +39,8 @@ def add_entry(worker_id: int, month: str, hours: float, AP_id: str, year: int):
         global_data_zettel_infos[worker_id] = []  # Inicializa a lista se não existir
 
     # Adiciona a nova entrada
-    global_data_zettel_infos[worker_id].append({"worker_id": worker_id, "year": year, "month": month, "hours": hours, "AP id": AP_id})
+    global_data_zettel_infos[worker_id].append(
+        {"worker_id": worker_id, "year": year, "month": month, "hours": hours, "AP id": AP_id})
 
 
 class AP:
@@ -359,32 +360,62 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
             sum_divided_hours = divided_hours[months_supposed_to_work]
 
         # chcek if work time limits are being surpased or not
-        if w.hours_available_per_month[year - first_year][month] >= divided_hours[months_supposed_to_work] and \
-                w.hours_available[year - first_year] >= sum_divided_hours:
-            if not worked_consecutively:
-                worked_consecutively = True
 
-            months.append(current_date)
-            hours_list.append(divided_hours[months_supposed_to_work])
-            total_hours_assigned += divided_hours[months_supposed_to_work]
-            sum_divided_hours = divided_hours[months_supposed_to_work] + sum_divided_hours
-            months_supposed_to_work += 1
-            consecutive_months += 1
+        if w.is_GF == 1:
+            if w.hours_available_per_month[year - first_year][month] - divided_hours[months_supposed_to_work] >= 0.5 and \
+                    w.hours_available[year - first_year] >= sum_divided_hours:
+                if not worked_consecutively:
+                    worked_consecutively = True
 
-        else:
-            # If worker stops due to lack of available hours after starting, break the loop
-            if worked_consecutively:
-                # If the worker worked continuously but didn't reach the required hours, continue working
-                while len(hours_list) < total_months:
-                    hours_list.append(0)
-                    current_date += relativedelta(months=1)
-                    months.append(current_date)
-                break
-            hours_list.append(0)
-            months.append(current_date)
+                months.append(current_date)
+                hours_list.append(divided_hours[months_supposed_to_work])
+                total_hours_assigned += divided_hours[months_supposed_to_work]
+                sum_divided_hours = divided_hours[months_supposed_to_work] + sum_divided_hours
+                months_supposed_to_work += 1
+                consecutive_months += 1
 
-        # Move to the next month
-        current_date += relativedelta(months=1)
+            else:
+                # If worker stops due to lack of available hours after starting, break the loop
+                if worked_consecutively:
+                    # If the worker worked continuously but didn't reach the required hours, continue working
+                    while len(hours_list) < total_months:
+                        hours_list.append(0)
+                        current_date += relativedelta(months=1)
+                        months.append(current_date)
+                    break
+                hours_list.append(0)
+                months.append(current_date)
+
+            # Move to the next month
+            current_date += relativedelta(months=1)
+
+        if w.is_GF == 0:
+            if w.hours_available_per_month[year - first_year][month] >= divided_hours[months_supposed_to_work] and \
+                    w.hours_available[year - first_year] >= sum_divided_hours:
+                if not worked_consecutively:
+                    worked_consecutively = True
+
+                months.append(current_date)
+                hours_list.append(divided_hours[months_supposed_to_work])
+                total_hours_assigned += divided_hours[months_supposed_to_work]
+                sum_divided_hours = divided_hours[months_supposed_to_work] + sum_divided_hours
+                months_supposed_to_work += 1
+                consecutive_months += 1
+
+            else:
+                # If worker stops due to lack of available hours after starting, break the loop
+                if worked_consecutively:
+                    # If the worker worked continuously but didn't reach the required hours, continue working
+                    while len(hours_list) < total_months:
+                        hours_list.append(0)
+                        current_date += relativedelta(months=1)
+                        months.append(current_date)
+                    break
+                hours_list.append(0)
+                months.append(current_date)
+
+            # Move to the next month
+            current_date += relativedelta(months=1)
 
     while len(hours_list) < total_months:
         hours_list.append(0)
