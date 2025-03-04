@@ -443,6 +443,10 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                     </tr>
             """
 
+    # Define the month order to ensure correct sorting
+    month_order = {'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
+                   'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12}
+
     all_data = []
     for worker_id, entries in AP.global_data_zettel_infos.items():
         all_data.extend(entries)
