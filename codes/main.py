@@ -515,7 +515,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
 
 # Streamlit UI
-st.title("Files Reader")
+st.title("Arbeitspakete Organizer")
 
 # File upload for AP and Worker files
 ap_file = upload_file("Select Excel File for AP")
