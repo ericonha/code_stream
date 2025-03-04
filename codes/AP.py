@@ -175,6 +175,10 @@ class AP:
             if pre_wk[0] != 0:
                 workers_pre = [item for w_pp in pre_wk for item in w_pp.split(";")]
                 for w_p in workers_pre:
+                    if " " not in w_p:
+                        ent_name = w_p.split("(")[0]
+                        worker_id_name = w_p.split("(")[1]
+                        w_p = ent_name + " " + "(" + worker_id_name
                     w_s = w_p.split(" ")
                     if w_s[0] == entity:
                         new_Nr.append(Nr[index_wh])
@@ -210,7 +214,6 @@ class AP:
                     continue
 
             index_wh += 1
-
         return worker_pre_list, data_start_pre, data_end_pre, aps_distributed
 
     def get_workers(self, lista_datas, ids, first_year, last_year, Nr, entity, df, pre_define_workers):
@@ -256,6 +259,8 @@ class AP:
 
             if pre_wk[0] != 0:
                 for strs in pre_wk:
+                    if " " not in strs:
+                        strs = strs.split("(")[0] + " " + "(" + strs.split("(")[1]
                     list_ent.append(strs.split(" ")[0])
                 if entity in list_ent:
                     self.workers.append(worker_pre_list[index_pre])
