@@ -535,7 +535,7 @@ else:
 if ap_file:
     df_ap = input_file.get_file(ap_file)
     entities = input_file.get_all_names(df_ap)  # Fetch list of entities dynamically from the file
-    entity = st.selectbox("Select Entity", entities)
+    entity = st.selectbox("Select Entity", entities[0:-1])
 
 # Input for output file name
 output_name = st.text_input("Enter the name of the file to be saved")
