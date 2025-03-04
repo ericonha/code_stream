@@ -35,8 +35,11 @@ def get_workers_info(filepath, lista_months):
         exit(1)
     list_workers = []
     for line in pf.values.__array__()[1:]:
-        w = worker.Worker(line[0], line[-1], len(line)-2)
-        for i in range(0, len(line)-2):
+        if line[-1] == "GF":
+            w = worker.Worker(line[0], line[-2], len(line) - 3, 1)
+        else:
+            w = worker.Worker(line[0], line[-2], len(line) - 3, 0)
+        for i in range(0, len(line) - 3):
             if math.isnan((line[i + 1])):
                 line[i + 1] = 10.5
             w.hours_available[i] = [line[i + 1]]
@@ -414,7 +417,7 @@ def get_dates_unix(df, lista):
     list_end = (list_end - (diff + 1))  # 7 see table
     lista_anos_begin = []
     lista_anos_end = []
-    months = np.array(df.values.__array__()[2][diff-1:])
+    months = np.array(df.values.__array__()[2][diff - 1:])
     years = get_years(df)
     years = filter_strings(years)
     lista_begin_datas_unix = []
