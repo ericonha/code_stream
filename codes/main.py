@@ -259,9 +259,6 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 w_id = w.id
             row_color = "red" if w_id == 0 else "#ccffcc"
 
-            if pre_w == 1:
-                row_color = "blue"
-
             if w_id == 0:
                 sum_test += wh
                 ap_not_distribute.append(id)
