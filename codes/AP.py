@@ -491,11 +491,11 @@ def choose_workers(start_date, end_date, required_hours, first_year, last_year, 
             for d, h in zip(dates, hours_list):
                 if h > 0:
                     add_entry(w.id, get_month_name(d), h, AP_id, d.year)
+                    locked += 1
 
             dates_distribution.append([dates])
             update_worker(w, hours_list, first_year, last_year, dates)
-            locked += 1
-
+            
         if counter > 2:
             work_distribution.append(worker_zero)
             hours_distribution.append(remaining_hours)
