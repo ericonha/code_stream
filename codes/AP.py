@@ -359,10 +359,8 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
         if month == 0:
             sum_divided_hours = divided_hours[months_supposed_to_work]
 
-        # chcek if work time limits are being surpased or not
-
-        if w.is_GF == 1:
-            if w.hours_available_per_month[year - first_year][month] - divided_hours[months_supposed_to_work] >= 0.5 and \
+        if w.is_GF:
+            if w.hours_available_per_month[year - first_year][month] - threshold >= 0.5 and \
                     w.hours_available[year - first_year] >= sum_divided_hours:
                 if not worked_consecutively:
                     worked_consecutively = True
@@ -386,10 +384,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
                 hours_list.append(0)
                 months.append(current_date)
 
-            # Move to the next month
-            current_date += relativedelta(months=1)
-
-        if w.is_GF == 0:
+        else:
             if w.hours_available_per_month[year - first_year][month] >= divided_hours[months_supposed_to_work] and \
                     w.hours_available[year - first_year] >= sum_divided_hours:
                 if not worked_consecutively:
@@ -414,8 +409,8 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
                 hours_list.append(0)
                 months.append(current_date)
 
-            # Move to the next month
-            current_date += relativedelta(months=1)
+        # Move to the next month
+        current_date += relativedelta(months=1)
 
     while len(hours_list) < total_months:
         hours_list.append(0)
