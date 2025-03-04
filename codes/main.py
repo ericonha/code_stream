@@ -330,7 +330,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     new_array = []
     while len(worker.list_of_workers) != 0:
-        lowest_index_elem = worker.Worker(1000, 0, 0)
+        lowest_index_elem = worker.Worker(1000, 0, 0, 0)
         for element in worker.list_of_workers:
             if element.id < lowest_index_elem.id:
                 lowest_index_elem = element
