@@ -143,7 +143,7 @@ def upload_file(label):
         return uploaded_file
     return None
 
-@st.cache_data
+
 def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     # create instance of AP to access functions
     ap1 = AP.AP()
