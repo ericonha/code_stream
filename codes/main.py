@@ -552,6 +552,10 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     with open("output.html", "w") as file:
         file.write(html_content_1)
 
+    # Save HTML content to a file
+    with open("output2.html", "w") as file:
+        file.write(html_content_2)
+
     if len(name_of_output_file) == 0:
         print("Error name of pdf, it cannot be empty")
         exit(1)
@@ -562,27 +566,43 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     # Convert HTML to PDF
     file_name = name_of_output_file + "_" + entity + ".pdf"
+    file_name_2 = name_of_output_file + "_" + entity + "_" + "organization" + ".pdf"
 
     try:
         # Generate the PDF from the HTML content using pdfkit
         pdf_output = BytesIO()
+        pdf_output_2 = BytesIO()
 
         # Use xhtml2pdf to generate the PDF
         pisa_status = pisa.CreatePDF(html_content_1, dest=pdf_output)
+        pisa_status_2 = pisa.CreatePDF(html_content_2, dest=pdf_output_2)
     
         # Check if PDF creation was successful
         if pisa_status.err:
             st.error(f"Error generating the PDF: {pisa_status.err}")
             return None
+
+        if pisa_status_2.err:
+            st.error(f"Error generating the PDF: {pisa_status.err}")
+            return None
         
         # Reset the pointer to the beginning of the BytesIO object
         pdf_output.seek(0)
+        pdf_output_2.seek(0)
 
         # Create a download button for the generated PDF
         st.download_button(
             label="Download PDF",
             data=pdf_output,
             file_name=file_name,
+            mime="application/pdf"
+        )
+
+        # Create a download button for the generated PDF
+        st.download_button(
+            label="Download PDF",
+            data=pdf_output_2,
+            file_name=file_name_2,
             mime="application/pdf"
         )
     except Exception as e:
