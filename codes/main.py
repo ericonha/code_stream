@@ -537,7 +537,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 <tr>
                     <td>{wk.id}</td>
                     <td>{hours}</td>
-                    <td>{year}</td>
+                    <td>{int(year)}</td>
                     <td>{months_german[month_idx]}</td>
                 </tr>
                 """
