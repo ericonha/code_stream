@@ -600,7 +600,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
         # Create a download button for the generated PDF
         st.download_button(
-            label="Download PDF",
+            label="Download PDF organization",
             data=pdf_output_2,
             file_name=file_name_2,
             mime="application/pdf"
