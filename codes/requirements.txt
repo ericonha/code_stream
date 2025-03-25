@@ -6,4 +6,3 @@ pdfkit==1.0.0
 python-dateutil
 webcolors
 xhtml2pdf
-zipfile
