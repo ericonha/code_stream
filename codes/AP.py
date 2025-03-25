@@ -360,7 +360,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
             sum_divided_hours = divided_hours[months_supposed_to_work]
 
         if w.is_GF:
-            if w.hours_available_per_month[year - first_year][month] - threshold >= 0.5 and \
+            if w.hours_available_per_month[year - first_year][month] - divided_hours[months_supposed_to_work] >= 0.5 and \
                     w.hours_available[year - first_year] >= sum_divided_hours:
                 if not worked_consecutively:
                     worked_consecutively = True
@@ -495,7 +495,7 @@ def choose_workers(start_date, end_date, required_hours, first_year, last_year, 
 
             dates_distribution.append([dates])
             update_worker(w, hours_list, first_year, last_year, dates)
-            
+
         if counter > 2:
             work_distribution.append(worker_zero)
             hours_distribution.append(remaining_hours)
