@@ -550,7 +550,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     # Save HTML content to a file
     with open("output.html", "w") as file:
-        file.write(html_content1)
+        file.write(html_content_1)
 
     if len(name_of_output_file) == 0:
         print("Error name of pdf, it cannot be empty")
@@ -568,7 +568,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         pdf_output = BytesIO()
 
         # Use xhtml2pdf to generate the PDF
-        pisa_status = pisa.CreatePDF(html_content, dest=pdf_output)
+        pisa_status = pisa.CreatePDF(html_content_1, dest=pdf_output)
     
         # Check if PDF creation was successful
         if pisa_status.err:
