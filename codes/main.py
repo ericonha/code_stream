@@ -11,6 +11,23 @@ import streamlit as st
 from datetime import datetime
 from xhtml2pdf import pisa
 
+def get_german_month(english_month):
+    months = {
+        "January": "Januar",
+        "February": "Februar",
+        "March": "März",
+        "April": "April",
+        "May": "Mai",
+        "June": "Juni",
+        "July": "Juli",
+        "August": "August",
+        "September": "September",
+        "October": "Oktober",
+        "November": "November",
+        "December": "Dezember"
+    }
+    return months.get(english_month, "Invalid month")
+
 
 def round_0_25(duration):
     duration = round_down_0_05(duration)
@@ -231,14 +248,14 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             </style>
         </head>
         <body>
-            <h1>Arbeits Packet Report</h1>
+            <h1>Arbeitspaketbericht</h1>
             <table>
                 <tr>
                     <th>Id</th>
                     <th>AP</th>
-                    <th>Start Date</th>
-                    <th>End Date</th>
-                    <th>Id Worker</th>
+                    <th>Startdatum</th>
+                    <th>Enddatum</th>
+                    <th>Id Arbeiter</th>
                     <th>WH</th>
                 </tr>
         """
@@ -306,15 +323,15 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             </style>
         </head>
         <body>
-            <h1>Sum Worker Report</h1>
+            <h1>Summen arbeiterbericht</h1>
             <table>
                 <tr>
-                    <th>year</th>
+                    <th>Jahr</th>
         """
 
     for i in range(len(worker.list_of_workers)):
         html_content += f"""
-                        <th>Sum Worker {i + 1}</th>
+                        <th>Summen arbeiter {i + 1}</th>
             """
     html_content += f"""
                 </tr>
@@ -340,7 +357,6 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     for i in range(len(years)):
         html_content += f"<tr>"
         html_content += f"<td>{int(years[i])}</td>"
-        print(len(worker.list_of_workers))
         for j in range(len(worker.list_of_workers)):
             html_content += f"<td>{(hours_year_work_every_one[j][i])-(worker.list_of_workers[j].hours_available[i][0])}</td>"
             sum_t += hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]
@@ -365,11 +381,11 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             </table>
             <table>
                 <tr>
-                   <th>Sum Total Hours</th>
-                   <th>hours not distributed</th>
-                   <th>APs not distributed</th>
-                   <th>Cost of Project</th>
-                   <th>Number of APs</th>
+                   <th>Summe der Gesamtstunden</th>
+                   <th>Stunden nicht verteilt</th>
+                   <th>APs nicht verteilt</th>
+                   <th>Projektkosten</th>
+                   <th>Anzahl der APs</th>
                 </tr>
         """
 
@@ -386,7 +402,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     aps_str = aps_str[:-2]
 
     if aps_str == "":
-        aps_str = "all aps distributed"
+        aps_str = "Alle APs verteilt"
 
     html_content += f"""
             <tr>
@@ -428,47 +444,108 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 </style>
             </head>
             <body>
-                <h1>Dates distribution</h1>
+                <h1>Terminverteilung</h1>
                 <table>
                     <tr>
-                        <th>Worker Id</th>
-                        <th>AP Id</th>
-                        <th>Month</th>
-                        <th>Year</th>
-                        <th>Hours</th>
-                        <th>PM (used to calculate hours 1 PM = 160 hours) </th>
+                        <th>Arbeiter-ID</th>
+                        <th>AP-Id</th>
+                        <th>Monat</th>
+                        <th>Jahr</th>
+                        <th>Stunden</th>
+                        <th>PM (wird zur Stundenberechnung verwendet: 1 PM = 160 Stunden) </th>
                     </tr>
             """
 
-    # Define the month order to ensure correct sorting
-    month_order = {'January': 1, 'February': 2, 'March': 3, 'April': 4, 'May': 5, 'June': 6,
-                   'July': 7, 'August': 8, 'September': 9, 'October': 10, 'November': 11, 'December': 12}
+    sorted_entries = sorted(
+        AP.global_data_zettel_infos.items(),  # Sort by worker_id
+        key=lambda x: (
+            x[0],  # Sort by worker_id (x[0] is the worker_id)
+            [entry['AP id'] for entry in x[1]],
+            [entry['year'] for entry in x[1]],  # Sort by year (x[1] contains the entries for each worker)
+            [entry['month'] for entry in x[1]]  # Sort by month (x[1] contains the entries for each worker)
+        )
+    )
 
-    all_data = []
-    for worker_id, entries in AP.global_data_zettel_infos.items():
-        all_data.extend(entries)
+    for worker_id, entries in sorted_entries:
+        for entry in entries:
+            # Extract month, hours, and PM
+            month = entry['month']
+            hours = entry['hours']
+            year = entry['year']
+            AP_id = entry['AP id']
 
-    sorted_data = sorted(all_data, key=lambda x: (x["worker_id"], x['year'], month_order[x['month']]))
+            # Add a row for each entry
+            html_content += f"""
+            <tr>
+                <td>{worker_id}</td>
+                <td>{AP_id}</td>
+                <td>{get_german_month(month)}</td>
+                <td>{year}</td>
+                <td>{hours*160}</td>
+                <td>{hours}</td>
+            </tr>
+            """
+    html_content += """
+             </table>
+         </body>
+         </html>
+         """
 
-    for entry in sorted_data:
-        # Extract month, hours, and PM
-        worker_id = entry['worker_id']
-        month = entry['month']
-        hours = entry['hours']
-        year = entry['year']
-        AP_id = entry['AP id']
-
-        # Add a row for each entry
-        html_content += f"""
-        <tr>
-            <td>{worker_id}</td>
-            <td>{AP_id}</td>
-            <td>{month}</td>
-            <td>{year}</td>
-            <td>{hours * 160}</td>
-            <td>{hours}</td>
-        </tr>
+    # Generate HTML content with styling for the second table
+    html_content += """
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                th, td {
+                    border: 1px solid #dddddd;
+                    text-align: left;
+                    padding: 10px;
+                }
+                th {
+                    background-color: #f2f2f2;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Monatlicher Arbeiterbericht</h1>
+            <table>
+                <tr>
+                    <th>Arbeiter</th>
+                    <th>Stunden</th>
+                    <th>Jahr</th>
+                    <th>Monat</th>
+                 </tr>
         """
+
+    months_german = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
+                    "November", "Dezember"]
+
+    for wk in worker.list_of_workers:
+        for year_idx, year in enumerate(years):
+            for month_idx in range(lista_months[year_idx]):  # Garantindo que os meses sejam iterados corretamente
+                hours = 1 - wk.hours_available_per_month[year_idx][month_idx]  # Pega as horas disponíveis
+                html_content += f"""
+                <tr>
+                    <td>{wk.id}</td>
+                    <td>{hours}</td>
+                    <td>{year}</td>
+                    <td>{months_german[month_idx]}</td>
+                </tr>
+                """
+
+    html_content += """
+            </table>
+        </body>
+        </html>
+    """
 
     # Save HTML content to a file
     with open("output.html", "w") as file:
