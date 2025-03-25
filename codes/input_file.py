@@ -304,6 +304,14 @@ def get_dates(filepath):
     fs_count_col = fs.max_column
     indexs_begin = []
     indexs_end = []
+    comparator_color = 0
+
+    first_color = fs.cell(column=8, row=6).fill.start_color.index
+
+    if first_color == 9:
+        comparator_color = 1
+    else:
+        comparator_color = 8
 
     # Iterate through rows and columns to find date blocks
     for row in range(6, fs_count_row + 1):
@@ -312,7 +320,8 @@ def get_dates(filepath):
         for column in range(total_id + 1, fs_count_col + 1):
             cell_color = fs.cell(column=column, row=row)
             # Check cell color to identify date blocks
-            if cell_color.fill.start_color.indexed == 8:
+            color = cell_color.fill.start_color
+            if color.index == comparator_color:
                 if column == 1:
                     break
                 if start == 0:
