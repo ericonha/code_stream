@@ -10,7 +10,6 @@ import pdfkit
 import streamlit as st
 from datetime import datetime
 from xhtml2pdf import pisa
-import zipfile
 
 def get_german_month(english_month):
     months = {
