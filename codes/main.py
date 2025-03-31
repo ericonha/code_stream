@@ -374,7 +374,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     # Add totals for each worker
     for total in workers_total_hours:
-        html_content_1 += f"<td><strong>{total}</strong></td>"
+        html_content_1 += f"<td><strong>{round(total,2)}</strong></td>"
 
     # Close the table and HTML body for the second table
     html_content_1 += """
