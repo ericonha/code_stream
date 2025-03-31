@@ -59,6 +59,7 @@ class AP:
         self.Nr = []  # List to store the number of workers
         self.working_dates_start = []
         self.working_dates_end = []
+        self.divider_counter = 0  # see how many times we split APs up
 
     def add_dates(self, dates_start_list, dates_end_list):
         # Add start and end dates to the planner
@@ -160,6 +161,7 @@ class AP:
         data_start_pre = []
         data_end_pre = []
         aps_distributed = []
+        hours_worked = []
 
         for idx, (start_date, end_date, interval_hours, pre_wk) in enumerate(
                 zip(self.dates_st, self.dates_ft, self.hours, pre_define_workers)):
@@ -184,8 +186,6 @@ class AP:
                     if w_s[0] == entity:
                         new_Nr.append(Nr[index_wh])
                         new_ids.append(ids[index_wh])
-
-                        h.append(interval_hours)
                         for wks in worker.list_of_workers:
                             if int(w_s[1][1]) == wks.id:
                                 max_m, h_s, m_s = max_consecutive_months_worker_can_work(wks,
@@ -196,15 +196,20 @@ class AP:
                                                                                          first_year,
                                                                                          interval_hours)
                                 if max(h_s) > 0:
+                                    hours_worked.append(h_s)
                                     update_worker(wks, h_s, first_year, last_year,
                                                   generate_monthly_dates(start_date, end_date))
                                     worker_pre_list.append(wks)
                                     for d, h_l in zip(m_s, h_s):
                                         if h_l > 0:
                                             add_entry(wks.id, get_month_name(d), h_l, ids[index_wh], d.year)
+                                        else:
+                                            add_entry(worker_zero.id, get_month_name(d), h_l, ids[index_wh], d.year)
+                                            break
                                     break
                                 else:
                                     worker_pre_list.append(worker_zero)
+                                    hours_worked.append([interval_hours])
 
                         data_start_pre.append(start_date)
                         data_end_pre.append(end_date)
@@ -215,7 +220,7 @@ class AP:
                     continue
 
             index_wh += 1
-        return worker_pre_list, data_start_pre, data_end_pre, aps_distributed
+        return worker_pre_list, data_start_pre, data_end_pre, aps_distributed, hours_worked
 
     def get_workers(self, lista_datas, ids, first_year, last_year, Nr, entity, df, pre_define_workers):
         self.workers = []
@@ -235,11 +240,12 @@ class AP:
         Nr = list(dict.fromkeys(Nr))  # Remove duplicates
 
         # calculating pre define workers
-        worker_pre_list, data_start_pre, data_end_pre, aps_distributed = self.generate_fix_workers(lista_datas, ids,
-                                                                                                   first_year,
-                                                                                                   last_year, Nr,
-                                                                                                   entity, df,
-                                                                                                   pre_define_workers)
+        worker_pre_list, data_start_pre, data_end_pre, aps_distributed, hours_worked = self.generate_fix_workers(
+            lista_datas, ids,
+            first_year,
+            last_year, Nr,
+            entity, df,
+            pre_define_workers)
         index_pre = 0
 
         for idx, (start_date, end_date, interval_hours, pre_wk) in enumerate(
@@ -270,7 +276,15 @@ class AP:
                     self.aps_number_distributed.append(aps_distributed[index_pre])
                     new_Nr.append(Nr[index_wh])
                     new_ids.append(ids[index_wh])
-                    h.append(interval_hours)
+                    h.append(sum(hours_worked[index_pre]))
+                    if sum(hours_worked[index_pre]) != interval_hours:
+                        self.workers.append(worker_zero)
+                        self.working_dates_start.append(data_start_pre[index_pre])
+                        self.working_dates_end.append(data_end_pre[index_pre])
+                        self.aps_number_distributed.append(aps_distributed[index_pre])
+                        new_Nr.append(Nr[index_wh])
+                        new_ids.append(ids[index_wh])
+                        h.append(interval_hours - sum(hours_worked[index_pre]))
                     index_pre += 1
                     index_wh += 1
                     list_pre_def.append(1)
@@ -293,6 +307,7 @@ class AP:
 
             else:
                 workers_array = np.zeros((len(worker.list_of_workers) + 1))
+                self.divider_counter += 1 - hours.count(0)
 
                 for wk, wh in zip(ch_workers, hours):
                     workers_array[wk.id] += wh
@@ -533,6 +548,8 @@ def generate_monthly_dates(start_date_str, end_date_str):
 
 
 def update_worker(w, hours_list, first_year, last_year, dates):
+    if w.id==0 :
+        print("ok")
     for d, h in zip(dates, hours_list):
         w.hours_available[d.year - first_year] -= h
         w.hours_available_per_month[d.year - first_year][d.month - 1] -= h
