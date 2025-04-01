@@ -520,9 +520,9 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             <table>
                 <tr>
                     <th>Arbeiter</th>
-                    <th>Stunden</th>
-                    <th>Jahr</th>
                     <th>Monat</th>
+                    <th>Jahr</th>
+                    <th>Stunden</th>
                  </tr>
         """
 
@@ -536,9 +536,9 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 html_content_2 += f"""
                 <tr>
                     <td>{wk.id}</td>
-                    <td>{hours}</td>
-                    <td>{int(year)}</td>
                     <td>{months_german[month_idx]}</td>
+                    <td>{int(year)}</td>
+                    <td>{hours*160}</td>
                 </tr>
                 """
 
