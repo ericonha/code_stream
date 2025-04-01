@@ -441,6 +441,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                     }
                     th {
                         background-color: #f2f2f2;
+                        font-size: 4.0em; /* Reduz o tamanho dos títulos */
                     }
                 </style>
             </head>
