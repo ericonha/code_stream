@@ -204,7 +204,6 @@ class AP:
                                         if h_l > 0:
                                             add_entry(wks.id, get_month_name(d), h_l, ids[index_wh], d.year)
                                         else:
-                                            add_entry(worker_zero.id, get_month_name(d), h_l, ids[index_wh], d.year)
                                             break
                                     break
                                 else:
