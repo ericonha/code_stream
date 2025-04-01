@@ -445,7 +445,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 </style>
             </head>
             <body>
-                <h1>Terminverteilung</h1>
+                <h1>Projektbearbeitungsstunden pro Arbeitspacket</h1>
                 <table>
                     <tr>
                         <th>Arbeiter-ID</th>
@@ -516,7 +516,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             </style>
         </head>
         <body>
-            <h1>Monatlicher Arbeiterbericht</h1>
+            <h1>Förderfähigen Personenstunden pro Monat</h1>
             <table>
                 <tr>
                     <th>Arbeiter</th>
