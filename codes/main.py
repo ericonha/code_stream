@@ -454,7 +454,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                         <th>Monat</th>
                         <th>Jahr</th>
                         <th>Stunden</th>
-                        <th>PM (1PM=160 Stunden)</th>
+                        <th>PM</th>
                     </tr>
             """
 
