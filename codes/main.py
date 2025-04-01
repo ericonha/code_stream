@@ -517,15 +517,13 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 </style>
             </head>
             <body>
-                <h1>Projektbearbeitungsstunden pro Arbeitspacket</h1>
+                <h1>Förderfähigen Personenstunden pro Monat</h1>
                 <table>
                     <tr>
                         <th>Arbeiter-ID</th>
-                        <th>AP-Id</th>
                         <th>Monat</th>
                         <th>Jahr</th>
                         <th>Stunden</th>
-                        <th>PM (wird zur Stundenberechnung verwendet: 1 PM = 160 Stunden) </th>
                     </tr>
             """
 
