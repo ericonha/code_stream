@@ -494,37 +494,43 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     # Generate HTML content with styling for the second table
     html_content_2 += """
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                }
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                th, td {
-                    border: 1px solid #dddddd;
-                    text-align: left;
-                    padding: 10px;
-                }
-                th {
-                    background-color: #f2f2f2;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Förderfähigen Personenstunden pro Monat</h1>
-            <table>
-                <tr>
-                    <th>Arbeiter</th>
-                    <th>Monat</th>
-                    <th>Jahr</th>
-                    <th>Stunden</th>
-                 </tr>
-        """
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid #dddddd;
+                text-align: left;
+                padding: 5px; /* Reduzido pela metade */
+                height: 25px; /* Reduzido pela metade */
+                font-size: 0.8em; /* Opcional: reduz o tamanho da fonte */
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Projektbearbeitungsstunden pro Arbeitspacket</h1>
+        <table>
+            <tr>
+                <th>Arbeiter-ID</th>
+                <th>AP-Id</th>
+                <th>Monat</th>
+                <th>Jahr</th>
+                <th>Stunden</th>
+                <th>PM (wird zur Stundenberechnung verwendet: 1 PM = 160 Stunden) </th>
+            </tr>
+        </table>
+    </body>
+</html>
 
     months_german = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
                     "November", "Dezember"]
