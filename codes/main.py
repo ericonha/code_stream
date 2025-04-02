@@ -549,9 +549,9 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     months_german = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
                      "November", "Dezember"]
 
-    first_year = 0
     last_month = 12
     for wk in worker.list_of_workers:
+        first_year = 0
         for year_idx, year in enumerate(years):
             if first_year == 0:
                 months_to_iterate = 12 - lista_months[year_idx]
