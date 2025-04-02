@@ -343,15 +343,21 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     cost_project = 0
 
     new_array = []
+    new_array_hours = []
     while len(worker.list_of_workers) != 0:
         lowest_index_elem = worker.Worker(1000, 0, 0, 0)
         for element in worker.list_of_workers:
             if element.id < lowest_index_elem.id:
                 lowest_index_elem = element
         new_array.append(lowest_index_elem)
+        index = worker.list_of_workers.index(lowest_index_elem)
+        new_array_hours.append(hours_year_work_every_one[index])
+
         worker.list_of_workers.remove(lowest_index_elem)
+        hours_year_work_every_one.remove(hours_year_work_every_one[index])
 
     worker.list_of_workers = new_array
+    hours_year_work_every_one = new_array_hours    
 
     # Add rows for sum worker data
     for i in range(len(years)):
