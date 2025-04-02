@@ -261,8 +261,11 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         """
 
     print(sum(h))
+    print(len(h))
+    print(len(ap1.working_dates_start))
     print(h)
     sum_test = 0
+    sum_test2 = 0
     ap_not_distribute = []
     years = np.linspace(ap1.year_start, ap1.year_end, ap1.year_end - ap1.year_start + 1)
     array_working_hours_per_year = np.zeros((len(worker.list_of_workers), len(years)))
@@ -281,6 +284,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 ap_not_distribute.append(id)
             else:
                 allocate_value(array_working_hours_per_year, dates_st, dates_ft, w_id, wh, years)
+                sum_test2 += wh
             html_content_1 += f"""
                         <tr style="background-color: {row_color};">
                             <td>{id}</td>
@@ -345,7 +349,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     new_array = []
     new_array_hours = []
     while len(worker.list_of_workers) != 0:
-        lowest_index_elem = worker.Worker(1000, 0, 0, 0)
+        lowest_index_elem = worker.Worker(1000, 0, 0, 0, "", "")
         for element in worker.list_of_workers:
             if element.id < lowest_index_elem.id:
                 lowest_index_elem = element
@@ -357,16 +361,17 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         hours_year_work_every_one.remove(hours_year_work_every_one[index])
 
     worker.list_of_workers = new_array
-    hours_year_work_every_one = new_array_hours    
+    hours_year_work_every_one = new_array_hours
 
     # Add rows for sum worker data
     for i in range(len(years)):
         html_content_1 += f"<tr>"
         html_content_1 += f"<td>{int(years[i])}</td>"
         for j in range(len(worker.list_of_workers)):
-            html_content_1 += f"<td>{(hours_year_work_every_one[j][i])-(worker.list_of_workers[j].hours_available[i][0])}</td>"
+            html_content_1 += f"<td>{(hours_year_work_every_one[j][i]) - (worker.list_of_workers[j].hours_available[i][0])}</td>"
             sum_t += hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]
-            cost_project += float(hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]) * worker.list_of_workers[j].salary
+            cost_project += float(hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]) * \
+                            worker.list_of_workers[j].salary
         html_content_1 += f"</tr>"
 
     # Add a row for total hours
@@ -380,7 +385,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     # Add totals for each worker
     for total in workers_total_hours:
-        html_content_1 += f"<td><strong>{round(total,2)}</strong></td>"
+        html_content_1 += f"<td><strong>{total}</strong></td>"
 
     # Close the table and HTML body for the second table
     html_content_1 += """
@@ -447,20 +452,19 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                     }
                     th {
                         background-color: #f2f2f2;
-                        font-size: 4.0em; /* Reduz o tamanho dos títulos */
                     }
                 </style>
             </head>
             <body>
-                <h1>Projektbearbeitungsstunden pro Arbeitspacket</h1>
+                <h1>Terminverteilung</h1>
                 <table>
                     <tr>
-                        <th>Arbeiter-ID</th>
+                        <th>Arbeiter</th>
                         <th>AP-Id</th>
                         <th>Monat</th>
                         <th>Jahr</th>
                         <th>Stunden</th>
-                        <th>PM</th>
+                        <th>PM (wird zur Stundenberechnung verwendet: 1 PM = 160 Stunden) </th>
                     </tr>
             """
 
@@ -482,14 +486,23 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             year = entry['year']
             AP_id = entry['AP id']
 
+            if hours == 0:
+                continue
+
+            name = ""
+
+            for wks in worker.list_of_workers:
+                if wks.id == worker_id:
+                    name = wks.name + " " + wks.surname
+
             # Add a row for each entry
             html_content_2 += f"""
             <tr>
-                <td>{worker_id}</td>
+                <td>{name}</td>
                 <td>{AP_id}</td>
                 <td>{get_german_month(month)}</td>
                 <td>{year}</td>
-                <td>{hours*160}</td>
+                <td>{hours * 160}</td>
                 <td>{hours}</td>
             </tr>
             """
@@ -501,53 +514,62 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     # Generate HTML content with styling for the second table
     html_content_2 += """
- <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    th, td {
-                         text-align: left;
-                         padding: 5px; /* Reduzido pela metade */
-                         height: 25px; /* Reduzido pela metade */
-                         font-size: 0.8em; /* Opcional: reduz o tamanho da fonte */
-                    }
-                    th {
-                        background-color: #f2f2f2;
-                        font-size: 4.0em; /* Reduz o tamanho dos títulos */
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>Förderfähigen Personenstunden pro Monat</h1>
-                <table>
-                    <tr>
-                        <th>Arbeiter-ID</th>
-                        <th>Monat</th>
-                        <th>Jahr</th>
-                        <th>Stunden</th>
-                    </tr>
-            """
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                th, td {
+                    border: 1px solid #dddddd;
+                    text-align: left;
+                    padding: 10px;
+                }
+                th {
+                    background-color: #f2f2f2;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Monatlicher Arbeiterbericht</h1>
+            <table>
+                <tr>
+                    <th>Arbeiter</th>
+                    <th>Stunden</th>
+                    <th>Jahr</th>
+                    <th>Monat</th>
+                 </tr>
+        """
 
     months_german = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
-                    "November", "Dezember"]
+                     "November", "Dezember"]
 
+    first_year = 0
+    last_month = 12
     for wk in worker.list_of_workers:
         for year_idx, year in enumerate(years):
-            for month_idx in range(lista_months[year_idx]):  # Garantindo que os meses sejam iterados corretamente
-                hours = 1 - wk.hours_available_per_month[year_idx][month_idx]  # Pega as horas disponíveis
+            if first_year == 0:
+                months_to_iterate = 12 - lista_months[year_idx]
+                first_year = 1
+            else:
+                months_to_iterate = 0
+                last_month = lista_months[year_idx]
+
+            for i in range(months_to_iterate, last_month):
+                month_idx = i
+                hours = 1 - wk.hours_available_per_month[year_idx][month_idx]
+
                 html_content_2 += f"""
                 <tr>
-                    <td>{wk.id}</td>
-                    <td>{months_german[month_idx]}</td>
+                    <td>{wk.name + " " + wk.surname}</td>
+                    <td>{hours}</td>
                     <td>{int(year)}</td>
-                    <td>{hours*160}</td>
+                    <td>{months_german[month_idx]}</td>
                 </tr>
                 """
 
