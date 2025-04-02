@@ -554,7 +554,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         first_year = 0
         for year_idx, year in enumerate(years):
             if first_year == 0:
-                months_to_iterate = 12 - lista_months[year_idx]
+                months_to_iterate = 12 - lista_months[0]
                 first_year = 1
             else:
                 months_to_iterate = 0
