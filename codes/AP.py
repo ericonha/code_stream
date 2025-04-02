@@ -156,7 +156,7 @@ class AP:
         new_Nr = []
         new_ids = []
         index_wh = 0
-        worker_zero = worker.Worker(0, 0, 0, 0)
+        worker_zero = worker.Worker(0, 0, 0, 0, "", "")
         worker_pre_list = []
         data_start_pre = []
         data_end_pre = []
@@ -204,6 +204,7 @@ class AP:
                                         if h_l > 0:
                                             add_entry(wks.id, get_month_name(d), h_l, ids[index_wh], d.year)
                                         else:
+                                            add_entry(worker_zero.id, get_month_name(d), h_l, ids[index_wh], d.year)
                                             break
                                     break
                                 else:
@@ -227,7 +228,7 @@ class AP:
         self.working_dates_start = []
         self.working_dates_end = []
         self.dates_distributed = []
-        worker_zero = worker.Worker(0, 0, 0, 0)
+        worker_zero = worker.Worker(0, 0, 0, 0, "", "")
 
         h = []
         new_Nr = []
@@ -318,7 +319,7 @@ class AP:
                         new_ids.append(ids[index_wh])
                         h.append(hours_worked)
                         if index == 0:
-                            self.workers.append(worker.Worker(0, 0, 0, 0))
+                            self.workers.append(worker.Worker(0, 0, 0, 0, "", ""))
                         else:
                             counter = 0
                             for w_s in worker.list_of_workers:
@@ -363,7 +364,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
     while current_date <= end_date and total_hours_assigned <= required_hours:
         month = current_date.month - 1
         year = current_date.year
-        threshold = 0.5 if w.is_GF == 1 else divided_hours[months_supposed_to_work]
+        threshold = w.perc_year if w.perc_year != 0 else divided_hours[months_supposed_to_work]
 
         # All hours have been parse
         if total_hours_assigned == required_hours:
@@ -373,8 +374,8 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
         if month == 0:
             sum_divided_hours = divided_hours[months_supposed_to_work]
 
-        if w.is_GF:
-            if w.hours_available_per_month[year - first_year][month] - divided_hours[months_supposed_to_work] >= 0.5 and \
+        if w.perc_year != 1:
+            if w.hours_available_per_month[year - first_year][month] - divided_hours[months_supposed_to_work] >= 1 - threshold and \
                     w.hours_available[year - first_year] >= sum_divided_hours:
                 if not worked_consecutively:
                     worked_consecutively = True
@@ -468,7 +469,7 @@ def choose_workers(start_date, end_date, required_hours, first_year, last_year, 
     loop = False
     locked = 0
     counter = 0
-    worker_zero = worker.Worker(0, 0, 0, 0)
+    worker_zero = worker.Worker(0, 0, 0, 0, "", "")
 
     while remaining_hours > 0 and current_date <= finishing_date:
 
@@ -547,7 +548,7 @@ def generate_monthly_dates(start_date_str, end_date_str):
 
 
 def update_worker(w, hours_list, first_year, last_year, dates):
-    if w.id==0 :
+    if w.id == 2:
         print("ok")
     for d, h in zip(dates, hours_list):
         w.hours_available[d.year - first_year] -= h
