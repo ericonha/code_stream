@@ -5,3 +5,4 @@ pandas
 pdfkit
 python-dateutil
 webcolors
+weasyprint
