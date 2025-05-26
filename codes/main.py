@@ -642,7 +642,14 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     """
 
     #path library
-    config = pdfkit.configuration()  # No path
+    wkhtmltopdf_path = shutil.which("wkhtmltopdf")
+    
+    if wkhtmltopdf_path is None:
+        raise RuntimeError("wkhtmltopdf not found")
+    else:
+        print(wkhtmltopdf_path)
+
+    config = pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_path)
 
     # Save HTML content to a file
     with open("output.html", "w") as file:
