@@ -6,3 +6,4 @@ pdfkit
 python-dateutil
 webcolors
 weasyprint
+xhtml2pdf
