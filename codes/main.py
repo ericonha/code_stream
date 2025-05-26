@@ -666,14 +666,19 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     try:
         # Generate the PDF from the HTML content using pdfkit
-        result_1 = io.BytesIO()
-        result_2 = io.BytesIO()
+        #result_1 = io.BytesIO()
+        #result_2 = io.BytesIO()
         
-        pisa.CreatePDF(html_content_1, dest=result_1)
-        pdf_output_1 = result_1.getvalue()
+        #pisa.CreatePDF(html_content_1, dest=result_1)
+        #pdf_output_1 = result_1.getvalue()
         
-        pdf_output_2 = pisa.CreatePDF(html_content_2, dest=result_2)
-        pdf_output_2 = result_2.getvalue()
+        #pdf_output_2 = pisa.CreatePDF(html_content_2, dest=result_2)
+        #pdf_output_2 = result_2.getvalue()
+
+        config = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')  # typical path on Linux
+
+        pdf_output_1 = pdfkit.from_string(html_content_1, False, configuration=config, options={"enable-local-file-access": ""})
+        pdf_output_2 = pdfkit.from_string(html_content_2, False, configuration=config, options={"enable-local-file-access": ""})
 
         
         # Create a download button for the generated PDF
