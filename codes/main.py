@@ -10,6 +10,7 @@ import pdfkit
 import streamlit as st
 from datetime import datetime
 import shutil
+from weasyprint import HTML
 
 def round_0_25(duration):
     duration = round_down_0_05(duration)
