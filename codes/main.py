@@ -10,7 +10,7 @@ import pdfkit
 import streamlit as st
 from datetime import datetime
 import shutil
-from weasyprint import HTML
+from xhtml2pdf import pisa
 
 def round_0_25(duration):
     duration = round_down_0_05(duration)
@@ -676,8 +676,10 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         # Generate the PDF from the HTML content using pdfkit
         #pdf_output_1 = pdfkit.from_string(html_content_1,False, configuration=config)
         #pdf_output_2 = pdfkit.from_string(html_content_2,False, configuration=config)
-        pdf_output_1 = HTML(string=html_content_1).write_pdf()
-        pdf_output_2 = HTML(string=html_content_2).write_pdf()
+        result_1 = io.BytesIO()
+        result_2 = io.BytesIO()
+        pdf_output_1 = pisa.CreatePDF(html_content_1, dest=result_1)
+        pdf_output_2 = pisa.CreatePDF(html_content_2, dest=result_2)
 
         # Create a download button for the generated PDF
         st.download_button(
