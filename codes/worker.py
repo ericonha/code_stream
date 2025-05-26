@@ -9,7 +9,7 @@ class Worker:
     The Worker class represents an individual worker and manages their availability and salary.
     """
 
-    def __init__(self, id, salary, years, perc_year, name, surname):
+    def __init__(self, id, salary, years, perc_year, name, surname, pm_per_ap):
         """
         Initialize a Worker object with an ID, salary, and availability for each year.
 
@@ -26,6 +26,7 @@ class Worker:
         self.perc_year = perc_year
         self.name = name
         self.surname = surname
+        self.pm_per_ap = pm_per_ap
 
     def __lt__(self, other):
         """
