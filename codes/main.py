@@ -681,7 +681,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             label=file_name_1,
             data=pdf_output_1,
             file_name=file_name_1,
-            mime="application/pdf"
+            mime="application/pdf",
             key="download1"
         )
 
@@ -689,7 +689,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             label=file_name_2,
             data=pdf_output_2,
             file_name=file_name_2,
-            mime="application/pdf"
+            mime="application/pdf",
             key="download2"
         )
     except Exception as e:
