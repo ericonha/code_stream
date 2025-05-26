@@ -4,7 +4,14 @@ import datetime
 import numpy as np
 import datetime
 from dateutil.relativedelta import relativedelta
+import random
+from typing import List, Tuple, Any
+from collections import Counter
 
+
+worker_0 = worker.Worker(0, 0, 0, 0, "", "", 0)
+
+order_aps = []
 
 class bcolors:
     HEADER = '\033[95m'
@@ -156,7 +163,7 @@ class AP:
         new_Nr = []
         new_ids = []
         index_wh = 0
-        worker_zero = worker.Worker(0, 0, 0, 0, "", "")
+        worker_zero = worker_0
         worker_pre_list = []
         data_start_pre = []
         data_end_pre = []
@@ -222,13 +229,13 @@ class AP:
             index_wh += 1
         return worker_pre_list, data_start_pre, data_end_pre, aps_distributed, hours_worked
 
-    def get_workers(self, lista_datas, ids, first_year, last_year, Nr, entity, df, pre_define_workers):
+    def get_workers(self, lista_datas, ids, first_year, last_year, Nr, entity, df, pre_define_workers, New_hours):
         self.workers = []
         self.working_hours = []
         self.working_dates_start = []
         self.working_dates_end = []
         self.dates_distributed = []
-        worker_zero = worker.Worker(0, 0, 0, 0, "", "")
+        worker_zero = worker_0
 
         h = []
         new_Nr = []
@@ -249,7 +256,7 @@ class AP:
         index_pre = 0
 
         for idx, (start_date, end_date, interval_hours, pre_wk) in enumerate(
-                zip(self.dates_st, self.dates_ft, self.hours, pre_define_workers)):
+                zip(lista_datas[0], lista_datas[1], New_hours, pre_define_workers)):
             interval_hours = float(interval_hours)
 
             # Calculate total months between start and end dates
@@ -305,6 +312,9 @@ class AP:
                 self.aps_number_distributed.append(ids[index_wh])
                 list_pre_def.append(0)
 
+                #new idea
+                order_aps.append((Nr[index_wh],ids[index_wh],start_date,end_date,dates,sum(hours),ch_workers[0]))
+
             else:
                 workers_array = np.zeros((len(worker.list_of_workers) + 1))
                 self.divider_counter += 1 - hours.count(0)
@@ -313,21 +323,33 @@ class AP:
                     workers_array[wk.id] += wh
                     list_pre_def.append(0)
 
-                for index, hours_worked in enumerate(workers_array):
-                    if hours_worked > 0:
+
+                counter = 0
+
+
+
+                for index_ws in range(len(workers_array)):
+                    if workers_array[index_ws] > 0:
+                        order_aps.append(
+                            (Nr[index_wh], ids[index_wh], start_date, end_date, [dates], workers_array[index_ws],
+                             worker.list_of_workers[index_ws-1]))
+                        counter += 1
+                        self.workers.append(worker.list_of_workers[index_ws-1])
                         new_Nr.append(Nr[index_wh])
                         new_ids.append(ids[index_wh])
-                        h.append(hours_worked)
-                        if index == 0:
-                            self.workers.append(worker.Worker(0, 0, 0, 0, "", ""))
-                        else:
-                            counter = 0
-                            for w_s in worker.list_of_workers:
-                                if w_s.id == index and counter == 0:
-                                    self.workers.append(w_s)
-                                    counter = counter + 1
+                        h.append(workers_array[index_ws])
                         self.working_dates_start.append(start_date)
                         self.working_dates_end.append(end_date)
+
+                if counter == 0:
+                    order_aps.append(
+                        (Nr[index_wh], ids[index_wh], start_date, end_date, [dates], hours[0],
+                         worker_0))
+                    new_Nr.append(Nr[index_wh])
+                    new_ids.append(ids[index_wh])
+                    h.append(0)
+                    self.working_dates_start.append(start_date)
+                    self.working_dates_end.append(end_date)
 
             index_wh += 1
         return h, new_ids, new_Nr, list_pre_def
@@ -335,7 +357,7 @@ class AP:
 
 def divide_hours_pm(hour, duration):
     hours_divided_list = []
-    hours_per_month = max(hour / duration, 0.25)
+    hours_per_month = max(hour / duration, input_file.step_increment)
     while hour - sum(hours_divided_list) >= hours_per_month:
         hours_divided_list.append(round_0_25(hours_per_month))
     if len(hours_divided_list) < duration:
@@ -376,7 +398,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
 
         if w.perc_year != 1:
             if w.hours_available_per_month[year - first_year][month] - divided_hours[months_supposed_to_work] >= 1 - threshold and \
-                    w.hours_available[year - first_year] >= sum_divided_hours:
+                    w.hours_available[year - first_year] >= sum_divided_hours and w.pm_per_ap >= total_hours_assigned + sum_divided_hours:
                 if not worked_consecutively:
                     worked_consecutively = True
 
@@ -401,7 +423,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
 
         else:
             if w.hours_available_per_month[year - first_year][month] >= divided_hours[months_supposed_to_work] and \
-                    w.hours_available[year - first_year] >= sum_divided_hours:
+                    w.hours_available[year - first_year] >= sum_divided_hours and w.pm_per_ap >= total_hours_assigned + sum_divided_hours:
                 if not worked_consecutively:
                     worked_consecutively = True
 
@@ -431,7 +453,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
         hours_list.append(0)
 
     if total_hours_assigned < required_hours:
-        return 0, hours_list, months
+        return consecutive_months, hours_list, months
 
     return consecutive_months, hours_list, months
 
@@ -469,7 +491,7 @@ def choose_workers(start_date, end_date, required_hours, first_year, last_year, 
     loop = False
     locked = 0
     counter = 0
-    worker_zero = worker.Worker(0, 0, 0, 0, "", "")
+    worker_zero = worker_0
 
     while remaining_hours > 0 and current_date <= finishing_date:
 
@@ -499,9 +521,10 @@ def choose_workers(start_date, end_date, required_hours, first_year, last_year, 
                 remaining_hours -= sum(hours_list)
 
             else:
-                remaining_hours -= sum(hours_list)
-                work_distribution.append(w)
-                hours_distribution.append(sum(hours_list))
+                if max_months > 0:
+                    remaining_hours -= sum(hours_list)
+                    work_distribution.append(w)
+                    hours_distribution.append(sum(hours_list))
 
             for d, h in zip(dates, hours_list):
                 if h > 0:
@@ -572,5 +595,148 @@ def calculate_delta(st, ft):
 def round_0_25(duration):
     comparator = 0
     while comparator < duration:
-        comparator += 0.25
+        comparator += input_file.step_increment
     return comparator
+
+
+def round_down_to_step(value):
+    return round((int(value)) * input_file.step_increment, 10)
+
+def round_up_to_step(value):
+    if value % input_file.step_increment == 0:
+        return value
+    return ((int(value / input_file.step_increment)) + 1) * input_file.step_increment
+
+def round_to_step(value):
+    """
+    Rounds value up to the nearest multiple of `step`,
+    but first rounds down to nearest 0.05.
+    """
+    value = round_down_to_step(value)  # optional pre-rounding
+    return round_up_to_step(value)
+
+
+def zip_lists(*lists: List[Any]) -> List[Tuple]:
+    """Zips multiple lists into a list of tuples (rows)."""
+    return list(zip(*lists))
+
+
+
+import random
+from typing import List, Any, Tuple
+
+import random
+from typing import List, Any, Tuple
+
+import random
+from typing import List, Any, Tuple
+
+
+def shuffle_aligned_lists(
+        Nrs: List[Any],
+        ids: List[Any],
+        year_start: List[Any],
+        year_end: List[Any],
+        pre_define_workers: List[Any],
+        hours: List[Any]
+) -> Tuple[List[Any], List[Any], List[Any], List[Any], List[Any], List[Any], List[int]]:
+    # Step 1: Map (Nr, ID) to their full data from year_start etc.
+    unique_data_map = {}
+    data_index = 0
+    for nr, id_ in zip(Nrs, ids):
+        key = (nr, id_)
+        if key not in unique_data_map and data_index < len(year_start):
+            unique_data_map[key] = (
+                year_start[data_index],
+                year_end[data_index],
+                pre_define_workers[data_index],
+                hours[data_index]
+            )
+            data_index += 1
+
+    # Step 2: Count occurrences
+    from collections import defaultdict
+    occurrence_count = defaultdict(int)
+    for nr, id_ in zip(Nrs, ids):
+        occurrence_count[(nr, id_)] += 1
+
+    # Step 3: Extract and shuffle unique keys
+    unique_keys = list(unique_data_map.keys())
+    random.shuffle(unique_keys)
+
+    # Step 4: Reconstruct aligned lists
+    New_Nrs = []
+    New_ids = []
+    New_year_start = []
+    New_year_end = []
+    New_pre_define_workers = []
+    New_hours = []
+    Shuffle_to_Original_Index = []
+
+
+    for key in unique_keys:
+        nr, id_ = key
+        occurrences = occurrence_count[key]
+        orig_indices = [i for i, (n, d) in enumerate(zip(Nrs, ids)) if (n, d) == key]
+
+        for i in range(occurrences):
+            New_Nrs.append(nr)
+            New_ids.append(id_)
+            Shuffle_to_Original_Index.append(orig_indices[i])
+            if i == 0:
+                # Original entry — has full data
+                ys, ye, pdw, hr = unique_data_map[key]
+                New_year_start.append(ys)
+                New_year_end.append(ye)
+                New_pre_define_workers.append(pdw)
+                New_hours.append(hr)
+
+    return New_Nrs, New_ids, New_year_start, New_year_end, New_pre_define_workers, New_hours,Shuffle_to_Original_Index
+
+
+def restore_by_index(
+    shuffled_Nrs: List[Any],
+    shuffled_ids: List[Any],
+    year_start: List[Any],
+    year_end: List[Any],
+    pre_define_workers: List[Any],
+    hours: List[Any],
+    workers: List[Any],
+    shuffle_to_original_idx: List[int]
+) -> Tuple[List[Any], List[Any], List[Any], List[Any], List[Any], List[Any]]:
+
+    n = max(shuffle_to_original_idx) + 1
+
+    # Initialize with zeros
+    Restored_Nrs = [None] * n
+    Restored_ids = [None] * n
+    Restored_year_start = ["0"] * n
+    Restored_year_end = ["0"] * n
+    Restored_pre_define_workers = [[0]] * n
+    Restored_hours = ["0"] * n
+    Restored_workers = [[0]] * n
+
+    unique_index = 0
+    seen = set()
+
+    for i, idx in enumerate(shuffle_to_original_idx):
+        nr = shuffled_Nrs[i]
+        id_ = shuffled_ids[i]
+        key = (nr, id_)
+
+        Restored_Nrs[idx] = nr
+        Restored_ids[idx] = id_
+
+        if key not in seen:
+            Restored_year_start[idx] = year_start[unique_index]
+            Restored_year_end[idx] = year_end[unique_index]
+            Restored_pre_define_workers[idx] = pre_define_workers[unique_index]
+            Restored_hours[idx] = hours[unique_index]
+            Restored_workers[idx] = workers[unique_index]
+            seen.add(key)
+            unique_index += 1
+
+    return Restored_Nrs, Restored_ids, Restored_year_start, Restored_year_end, Restored_pre_define_workers, Restored_hours
+
+
+
