@@ -6,3 +6,4 @@ pdfkit
 python-dateutil
 webcolors
 xhtml2pdf
+base64
