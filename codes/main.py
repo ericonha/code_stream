@@ -682,6 +682,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             data=pdf_output_1,
             file_name=file_name_1,
             mime="application/pdf"
+            key="download1"
         )
 
         st.download_button(
@@ -689,6 +690,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
             data=pdf_output_2,
             file_name=file_name_2,
             mime="application/pdf"
+            key="download2"
         )
     except Exception as e:
         st.error(f"Error generating the PDF: {e}")
