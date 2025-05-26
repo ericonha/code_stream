@@ -642,8 +642,8 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     """
 
     #path library
-    path_wkhtmltopdf = "/usr/local/bin/wkhtmltopdf"
-    config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+    #path_wkhtmltopdf = "/usr/local/bin/wkhtmltopdf"
+    #config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
 
     # Save HTML content to a file
     with open("output.html", "w") as file:
@@ -666,8 +666,10 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     try:
         # Generate the PDF from the HTML content using pdfkit
-        pdf_output_1 = pdfkit.from_string(html_content_1,False, configuration=config)
-        pdf_output_2 = pdfkit.from_string(html_content_2,False, configuration=config)
+        #pdf_output_1 = pdfkit.from_string(html_content_1,False, configuration=config)
+        #pdf_output_2 = pdfkit.from_string(html_content_2,False, configuration=config)
+        pdf_output_1 = pdfkit.from_string(html_content_1)
+        pdf_output_2 = pdfkit.from_string(html_content_2)
 
         # Create a download button for the generated PDF
         st.download_button(
