@@ -2,8 +2,7 @@ openpyxl==3.1.2
 streamlit
 numpy
 pandas
-pdfkit==1.0.0
+pdfkit
 python-dateutil
 webcolors
 xhtml2pdf
-wkhtmltopdf
