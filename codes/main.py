@@ -675,7 +675,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         #pdf_output_2 = pisa.CreatePDF(html_content_2, dest=result_2)
         #pdf_output_2 = result_2.getvalue()
 
-        config = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')  # typical path on Linux
+        config = pdfkit.configuration(wkhtmltopdf='/usr/local/bin/wkhtmltopdf')  # typical path on Linux
 
         pdf_output_1 = pdfkit.from_string(html_content_1, False, configuration=config, options={"enable-local-file-access": ""})
         pdf_output_2 = pdfkit.from_string(html_content_2, False, configuration=config, options={"enable-local-file-access": ""})
