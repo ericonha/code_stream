@@ -5,4 +5,3 @@ pandas
 pdfkit
 python-dateutil
 webcolors
-base64
