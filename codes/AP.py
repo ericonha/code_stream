@@ -7,11 +7,14 @@ from dateutil.relativedelta import relativedelta
 import random
 from typing import List, Tuple, Any
 from collections import Counter
+import time
 
 
 worker_0 = worker.Worker(0, 0, 0, 0, "", "", 0)
 
 order_aps = []
+global_data_zettel_infos = {}
+
 
 class bcolors:
     HEADER = '\033[95m'
@@ -32,10 +35,6 @@ def months_between(start_date, end_date):
     start_date = datetime.datetime.strptime(start_date, "%d.%m.%Y")
     end_date = datetime.datetime.strptime(end_date, "%d.%m.%Y")
     return (end_date.year - start_date.year) * 12 + end_date.month - start_date.month + 1
-
-
-global_data_zettel_infos = {}
-
 
 def add_entry(worker_id: int, month: str, hours: float, AP_id: str, year: int):
     """Adiciona uma entrada no dicionário global."""
@@ -157,7 +156,7 @@ class AP:
             index_Nr = index_Nr + 1
             index += 1
 
-    def generate_fix_workers(self, lista_datas, ids, first_year, last_year, Nr, entity, df, pre_define_workers):
+    def generate_fix_workers(self, lista_datas, ids, first_year, last_year, Nr, entity, df, pre_define_workers, hours):
 
         h = []
         new_Nr = []
@@ -171,7 +170,7 @@ class AP:
         hours_worked = []
 
         for idx, (start_date, end_date, interval_hours, pre_wk) in enumerate(
-                zip(self.dates_st, self.dates_ft, self.hours, pre_define_workers)):
+                zip(lista_datas[0], lista_datas[1], hours, pre_define_workers)):
             interval_hours = float(interval_hours)
 
             # Calculate total months between start and end dates
@@ -191,8 +190,6 @@ class AP:
                         w_p = ent_name + " " + "(" + worker_id_name
                     w_s = w_p.split(" ")
                     if w_s[0] == entity:
-                        new_Nr.append(Nr[index_wh])
-                        new_ids.append(ids[index_wh])
                         for wks in worker.list_of_workers:
                             if int(w_s[1][1]) == wks.id:
                                 max_m, h_s, m_s = max_consecutive_months_worker_can_work(wks,
@@ -201,28 +198,38 @@ class AP:
                                                                                          datetime.datetime.strptime(
                                                                                              end_date, "%d.%m.%Y"),
                                                                                          first_year,
-                                                                                         interval_hours)
-                                if max(h_s) > 0:
-                                    hours_worked.append(h_s)
-                                    update_worker(wks, h_s, first_year, last_year,
-                                                  generate_monthly_dates(start_date, end_date))
-                                    worker_pre_list.append(wks)
+                                                                                         interval_hours,True)
+                                if max(h_s) > 0 and sum(h_s) == interval_hours:
+                                    counter = 0
+                                    dates = generate_monthly_dates(start_date, end_date)
+                                    update_worker(wks, h_s, first_year, last_year, dates)
+                                    order_aps.append(
+                                        (Nr[index_wh], ids[index_wh], start_date, end_date, [dates],
+                                         interval_hours,wks))
                                     for d, h_l in zip(m_s, h_s):
                                         if h_l > 0:
                                             add_entry(wks.id, get_month_name(d), h_l, ids[index_wh], d.year)
+                                            if counter == 0:
+                                                new_Nr.append(Nr[index_wh])
+                                                new_ids.append(ids[index_wh])
+                                                hours_worked.append(h_s)
+                                                data_start_pre.append(start_date)
+                                                data_end_pre.append(end_date)
+                                                aps_distributed.append(ids[index_wh])
+                                                worker_pre_list.append(wks)
+                                                counter =+ 1
                                         else:
                                             add_entry(worker_zero.id, get_month_name(d), h_l, ids[index_wh], d.year)
+                                            order_aps.append(
+                                                (Nr[index_wh], ids[index_wh], start_date, end_date, [dates],
+                                                 interval_hours, worker_zero))
                                             break
                                     break
                                 else:
                                     worker_pre_list.append(worker_zero)
-                                    hours_worked.append([interval_hours])
-
-                        data_start_pre.append(start_date)
-                        data_end_pre.append(end_date)
-                        aps_distributed.append(ids[index_wh])
                         index_wh += 1
                         checker += 1
+                    worker_pre_list.append(worker_zero)
                 if checker != 0:
                     continue
 
@@ -252,7 +259,7 @@ class AP:
             first_year,
             last_year, Nr,
             entity, df,
-            pre_define_workers)
+            pre_define_workers, New_hours)
         index_pre = 0
 
         for idx, (start_date, end_date, interval_hours, pre_wk) in enumerate(
@@ -272,30 +279,31 @@ class AP:
             list_ent = []
 
             if pre_wk[0] != 0:
-                for strs in pre_wk:
-                    if " " not in strs:
-                        strs = strs.split("(")[0] + " " + "(" + strs.split("(")[1]
-                    list_ent.append(strs.split(" ")[0])
-                if entity in list_ent:
-                    self.workers.append(worker_pre_list[index_pre])
-                    self.working_dates_start.append(data_start_pre[index_pre])
-                    self.working_dates_end.append(data_end_pre[index_pre])
-                    self.aps_number_distributed.append(aps_distributed[index_pre])
-                    new_Nr.append(Nr[index_wh])
-                    new_ids.append(ids[index_wh])
-                    h.append(sum(hours_worked[index_pre]))
-                    if sum(hours_worked[index_pre]) != interval_hours:
-                        self.workers.append(worker_zero)
+                if worker_pre_list[index_pre]!=worker_zero:
+                    for strs in pre_wk:
+                        if " " not in strs:
+                            strs = strs.split("(")[0] + " " + "(" + strs.split("(")[1]
+                        list_ent.append(strs.split(" ")[0])
+                    if entity in list_ent:
+                        self.workers.append(worker_pre_list[index_pre])
                         self.working_dates_start.append(data_start_pre[index_pre])
                         self.working_dates_end.append(data_end_pre[index_pre])
                         self.aps_number_distributed.append(aps_distributed[index_pre])
                         new_Nr.append(Nr[index_wh])
                         new_ids.append(ids[index_wh])
-                        h.append(interval_hours - sum(hours_worked[index_pre]))
-                    index_pre += 1
-                    index_wh += 1
-                    list_pre_def.append(1)
-                    continue
+                        h.append(sum(hours_worked[index_pre]))
+                        if sum(hours_worked[index_pre]) != interval_hours:
+                            self.workers.append(worker_zero)
+                            self.working_dates_start.append(data_start_pre[index_pre])
+                            self.working_dates_end.append(data_end_pre[index_pre])
+                            self.aps_number_distributed.append(aps_distributed[index_pre])
+                            new_Nr.append(Nr[index_wh])
+                            new_ids.append(ids[index_wh])
+                            h.append(interval_hours - sum(hours_worked[index_pre]))
+                        index_pre += 1
+                        index_wh += 1
+                        list_pre_def.append(1)
+                        continue
 
             ch_workers, hours, dates = choose_workers(start_date, end_date, interval_hours, first_year, last_year,
                                                       ids[index_wh])
@@ -369,7 +377,7 @@ def divide_hours_pm(hour, duration):
     return hours_divided_list
 
 
-def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, required_hours):
+def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, required_hours, fix_w):
     consecutive_months = 0
     months = []
     hours_list = []
@@ -398,7 +406,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
 
         if w.perc_year != 1:
             if w.hours_available_per_month[year - first_year][month] - divided_hours[months_supposed_to_work] >= 1 - threshold and \
-                    w.hours_available[year - first_year] >= sum_divided_hours and w.pm_per_ap >= total_hours_assigned + sum_divided_hours:
+                    w.hours_available[year - first_year] >= sum_divided_hours and (fix_w or w.pm_per_ap >= sum_divided_hours):
                 if not worked_consecutively:
                     worked_consecutively = True
 
@@ -423,7 +431,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
 
         else:
             if w.hours_available_per_month[year - first_year][month] >= divided_hours[months_supposed_to_work] and \
-                    w.hours_available[year - first_year] >= sum_divided_hours and w.pm_per_ap >= total_hours_assigned + sum_divided_hours:
+                    w.hours_available[year - first_year] >= sum_divided_hours and (fix_w or w.pm_per_ap >= sum_divided_hours):
                 if not worked_consecutively:
                     worked_consecutively = True
 
@@ -513,7 +521,7 @@ def choose_workers(start_date, end_date, required_hours, first_year, last_year, 
             max_months, hours_list, dates = max_consecutive_months_worker_can_work(w, current_date,
                                                                                    finishing_date,
                                                                                    first_year,
-                                                                                   remaining_hours)
+                                                                                   remaining_hours, False)
 
             if remaining_hours - sum(hours_list) == 0:
                 work_distribution.append(w)
@@ -571,8 +579,6 @@ def generate_monthly_dates(start_date_str, end_date_str):
 
 
 def update_worker(w, hours_list, first_year, last_year, dates):
-    if w.id == 2:
-        print("ok")
     for d, h in zip(dates, hours_list):
         w.hours_available[d.year - first_year] -= h
         w.hours_available_per_month[d.year - first_year][d.month - 1] -= h
@@ -662,6 +668,7 @@ def shuffle_aligned_lists(
 
     # Step 3: Extract and shuffle unique keys
     unique_keys = list(unique_data_map.keys())
+    random.seed(time.time_ns())
     random.shuffle(unique_keys)
 
     # Step 4: Reconstruct aligned lists
