@@ -13,6 +13,18 @@ from datetime import datetime
 import shutil
 from xhtml2pdf import pisa
 import copy
+import zipfile
+
+
+def calculate_proj_cost(years, hours_year_work_every_one):
+    # Add rows for sum worker data
+    cost_project = 0
+    for i in range(len(years)):
+        for j in range(len(worker.list_of_workers)):
+            cost_project += round(float(hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]) * \
+                            worker.list_of_workers[j].salary,2)
+    return cost_project
+
 
 def round_0_25(duration):
     duration = round_down_0_05(duration)
@@ -34,6 +46,7 @@ def round_down_0_05(number):
         return int(number * 20) / 20
     else:
         return number
+
 
 def get_german_month(english_month):
     months = {
@@ -113,6 +126,7 @@ def allocate_value(array, start_date, end_date, worker_id, value, years):
             array[worker_id - 1][year_index] += year_allocation
 
     return array
+
 
 # Add custom CSS for Streamlit to style the elements
 st.markdown("""
@@ -221,17 +235,47 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     pre_define_workers = input_file.get_workers_pre_defined(df)
 
-    New_Nrs, New_ids, New_year_start, New_year_end, New_pre_define_workers, New_hours, Shuffle_to_Original_Index = AP.shuffle_aligned_lists(ap1.Nr, ids, lista_datas_not_to_change[0], lista_datas_not_to_change[1], pre_define_workers, ap1.hours)
+    years = np.linspace(ap1.year_start, ap1.year_end, ap1.year_end - ap1.year_start + 1)
+    list_aps = []
+    dict_aps_infos = {}
+    cost = 0
 
-    h, ids_check, Nrs, pre_def = ap1.get_workers([New_year_start,New_year_end], New_ids, ap1.year_start, ap1.year_end, New_Nrs,
-                                                 entity,
-                                                 df, New_pre_define_workers, New_hours)
+    for times in range(100):
 
-    #h, ids_check, Nrs, pre_def = ap1.get_workers(lista_datas_not_to_change, ids, ap1.year_start, ap1.year_end, ap1.Nr,
-    #                                             entity,
-    #                                             df, pre_define_workers, ap1.hours)
+        # clear workers info
+        worker.list_of_workers.clear()
+
+        # get workers hours
+        input_file.get_workers_info(filepath_workers, lista_months)
+
+        # sorte the worker from most expensive to least
+        worker.sorte_workers()
+
+        New_Nrs, New_ids, New_year_start, New_year_end, New_pre_define_workers, New_hours, Shuffle_to_Original_Index = AP.shuffle_aligned_lists(
+            ap1.Nr, ids, lista_datas_not_to_change[0], lista_datas_not_to_change[1], pre_define_workers, ap1.hours)
+
+        h, ids_check, Nrs, pre_def = ap1.get_workers([New_year_start, New_year_end], New_ids, ap1.year_start,
+                                                     ap1.year_end, New_Nrs,
+                                                     entity,
+                                                     df, New_pre_define_workers, New_hours)
+
+        # h, ids_check, Nrs, pre_def = ap1.get_workers(lista_datas_not_to_change, ids, ap1.year_start, ap1.year_end, ap1.Nr,
+        #                                             entity,
+        #                                             df, pre_define_workers, ap1.hours)
+
+        cost_this_version = calculate_proj_cost(years, hours_year_work_every_one)
+
+        if cost_this_version > cost:
+            cost = cost_this_version
+            list_aps.clear()
+            list_aps = AP.order_aps.copy()
+            dict_aps_infos = copy.deepcopy(AP.global_data_zettel_infos)
+        AP.order_aps.clear()
+        AP.global_data_zettel_infos.clear()
 
     # For example, reconstruct data arrays
+    AP.order_aps = list_aps
+    AP.global_data_zettel_infos = dict_aps_infos
     order_aps_final = sorted(AP.order_aps, key=lambda x: tuple(map(float, x[1].split("."))))
 
     restored_Nrs = [x[0] for x in order_aps_final]
@@ -242,139 +286,131 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     restored_hours = [x[5] for x in order_aps_final]
     restored_workers = [x[6] for x in order_aps_final]
 
-
-
-
     html_content_1 = """
-    <html lang="de">
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 20px;
-            }
-            h1 {
-                color: #333;
-                text-align: center;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 20px;
-                table-layout: fixed;
-            }
-            th, td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-                overflow: hidden;
-                white-space: normal;
-                word-break: normal;      /* Only break at natural points */
-                hyphens: auto;           /* Allow hyphenation */
-            }
-            th {
-                background-color: #f2f2f2;
-                color: #333;
-            }
-            tr:nth-child(even) {
-                background-color: #f9f9f9;
-            }
-            tr:hover {
-                background-color: #f5f5f5;
-            }
-            td:nth-child(2) {
-                font-size: 12px;  /* Adjust the font size as needed */
-            }
-        </style>
-    </head>
-    <body>
-        <h1>Arbeitspaketbericht</h1>
-        <table>
-            <colgroup>
-                <col style="width:10%">    <!-- Id -->
-                <col style="width:37%">   <!-- AP (WIDER) -->
-                <col style="width:17%">   <!-- Startdatum -->
-                <col style="width:17%">   <!-- Enddatum -->
-                <col style="width:10%">    <!-- Id Arbeiter -->
-                <col style="width:8%">    <!-- WH -->
-            </colgroup>
-            <tr>
-                <th>Id</th>
-                <th>AP</th>
-                <th>Startdatum</th>
-                <th>Enddatum</th>
-                <th>Id Arbeiter</th>
-                <th>WH</th>
-            </tr>
-    """
-
-    print(sum(h))
-    print(len(h))
-    print(len(ap1.working_dates_start))
-    print(h)
-    sum_test = 0
-    sum_test2 = 0
-    ap_not_distribute = []
-    years = np.linspace(ap1.year_start, ap1.year_end, ap1.year_end - ap1.year_start + 1)
-    array_working_hours_per_year = np.zeros((len(worker.list_of_workers), len(years)))
-
-    for w, wh, dates_st, dates_ft, Nr, id in zip(restored_workers,restored_hours,restored_start,restored_end,
-                                                 restored_Nrs,restored_ids):
-        html_content_1 += f"""
-                                <tr style="background-color: {"#ccffcc"};">
-                                    <td>{id}</td>
-                                    <td>{Nr}</td>
-                                    <td>{dates_st}</td>
-                                    <td>{dates_ft}</td>
-                                    <td>{w.id}</td>
-                                    <td>{round(wh,2)}</td>
-                                </tr>
-                        """
-    html_content_1 += """
-                    </table>
-                    <div style="page-break-before: always;"></div>
-                </body>
-                """
-
-    # Generate HTML content with styling for the second table
-    html_content_1 += """
-        <html>
+        <html lang="de">
         <head>
             <meta charset="UTF-8">
             <style>
                 body {
                     font-family: Arial, sans-serif;
+                    margin: 20px;
+                }
+                h1 {
+                    color: #333;
+                    text-align: center;
                 }
                 table {
                     width: 100%;
                     border-collapse: collapse;
+                    margin-bottom: 20px;
+                    table-layout: fixed;
                 }
                 th, td {
-                    border: 1px solid #dddddd;
+                    border: 1px solid #ddd;
+                    padding: 8px;
                     text-align: left;
-                    padding: 10px;
-                    font-size: 12px;
+                    overflow: hidden;
+                    white-space: normal;
+                    word-break: normal;      /* Only break at natural points */
+                    hyphens: auto;           /* Allow hyphenation */
                 }
                 th {
                     background-color: #f2f2f2;
+                    color: #333;
+                }
+                tr:nth-child(even) {
+                    background-color: #f9f9f9;
+                }
+                tr:hover {
+                    background-color: #f5f5f5;
+                }
+                td:nth-child(2) {
+                    font-size: 12px;  /* Adjust the font size as needed */
                 }
             </style>
         </head>
         <body>
-            <h1>Summen arbeiterbericht</h1>
+            <h1>Arbeitspaketbericht</h1>
             <table>
+                <colgroup>
+                    <col style="width:10%">    <!-- Id -->
+                    <col style="width:37%">   <!-- AP (WIDER) -->
+                    <col style="width:17%">   <!-- Startdatum -->
+                    <col style="width:17%">   <!-- Enddatum -->
+                    <col style="width:10%">    <!-- Id Arbeiter -->
+                    <col style="width:8%">    <!-- WH -->
+                </colgroup>
                 <tr>
-                    <th>Jahr</th>
+                    <th>Id</th>
+                    <th>AP</th>
+                    <th>Startdatum</th>
+                    <th>Enddatum</th>
+                    <th>Id Arbeiter</th>
+                    <th>WH</th>
+                </tr>
         """
+
+    sum_test = 0
+    sum_test2 = 0
+    ap_not_distribute = []
+    array_working_hours_per_year = np.zeros((len(worker.list_of_workers), len(years)))
+
+    for w, wh, dates_st, dates_ft, Nr, id in zip(restored_workers, restored_hours, restored_start, restored_end,
+                                                 restored_Nrs, restored_ids):
+        html_content_1 += f"""
+                                    <tr style="background-color: {"#ccffcc"};">
+                                        <td>{id}</td>
+                                        <td>{Nr}</td>
+                                        <td>{dates_st}</td>
+                                        <td>{dates_ft}</td>
+                                        <td>{w.id}</td>
+                                        <td>{round(wh, 2)}</td>
+                                    </tr>
+                            """
+    html_content_1 += """
+                        </table>
+                        <div style="page-break-before: always;"></div>
+                    </body>
+                    """
+
+    # Generate HTML content with styling for the second table
+    html_content_1 += """
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    th, td {
+                        border: 1px solid #dddddd;
+                        text-align: left;
+                        padding: 10px;
+                        font-size: 12px;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>Summen arbeiterbericht</h1>
+                <table>
+                    <tr>
+                        <th>Jahr</th>
+            """
 
     for i in range(len(worker.list_of_workers)):
         html_content_1 += f"""
-                        <th>Summen arbeiter {i + 1}</th>
-            """
+                            <th>Summen arbeiter {i + 1}</th>
+                """
     html_content_1 += f"""
-                </tr>
-        """
+                    </tr>
+            """
 
     p_p_y = np.array(lista_months) / 12
 
@@ -384,7 +420,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     new_array = []
     new_array_hours = []
     while len(worker.list_of_workers) != 0:
-        lowest_index_elem = worker.Worker(1000, 0, 0, 0, "", "",0)
+        lowest_index_elem = worker.Worker(1000, 0, 0, 0, "", "", 0)
         for element in worker.list_of_workers:
             if element.id < lowest_index_elem.id:
                 lowest_index_elem = element
@@ -403,10 +439,11 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         html_content_1 += f"<tr>"
         html_content_1 += f"<td>{int(years[i])}</td>"
         for j in range(len(worker.list_of_workers)):
-            html_content_1 += f"<td>{round((hours_year_work_every_one[j][i]) - (worker.list_of_workers[j].hours_available[i][0]),2)}</td>"
+            html_content_1 += f"<td>{round((hours_year_work_every_one[j][i]) - (worker.list_of_workers[j].hours_available[i][0]), 2)}</td>"
             sum_t += hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]
-            cost_project += round(float(hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]) * \
-                            worker.list_of_workers[j].salary,2)
+            cost_project += round(
+                float(hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]) * \
+                worker.list_of_workers[j].salary, 2)
         html_content_1 += f"</tr>"
 
     # Add a row for total hours
@@ -426,28 +463,24 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
     for index_ele in range(len(workers_total_hours)):
         total_w.append(sum(np.array(hours_year_work_every_one[index_ele]) - np.array(workers_total_hours[index_ele])))
 
-
-
     # Add totals for each worker
     for total in total_w:
-        html_content_1 += f"<td><strong>{round(total,2)}</strong></td>"
+        html_content_1 += f"<td><strong>{round(total, 2)}</strong></td>"
 
     # Close the table and HTML body for the second table
     html_content_1 += """
-            </table>
-            <table>
-                <tr>
-                   <th>Summe der Gesamtstunden</th>
-                   <th>Stunden nicht verteilt</th>
-                   <th>APs nicht verteilt</th>
-                   <th>Projektkosten</th>
-                   <th>Anzahl der APs</th>
-                </tr>
-        """
+                </table>
+                <table>
+                    <tr>
+                       <th>Summe der Gesamtstunden</th>
+                       <th>Stunden nicht verteilt</th>
+                       <th>APs nicht verteilt</th>
+                       <th>Projektkosten</th>
+                       <th>Anzahl der APs</th>
+                    </tr>
+            """
 
     sum_t_b = sum_t
-    print(sum_t_b)
-    print(sum_t - sum_t_b)
     cost_project_formatted = format_euros(cost_project)
     aps_str = ""
 
@@ -461,23 +494,120 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         aps_str = "Alle APs verteilt"
 
     html_content_1 += f"""
-            <tr>
-                <td>{round(sum_t_b,2)}</td>
-                <td>{sum_test}</td>
-                <td>{aps_str}</td>
-                <td>{cost_project_formatted}</td>
-                <td>{len(h)}</td>
-            </tr>
-        """
+                <tr>
+                    <td>{round(sum_t_b, 2)}</td>
+                    <td>{sum_test}</td>
+                    <td>{aps_str}</td>
+                    <td>{cost_project_formatted}</td>
+                    <td>{len(h)}</td>
+                </tr>
+            """
 
     html_content_1 += """
-        </table>
-        </body>
-        </html>
-        """
+            </table>
+            </body>
+            </html>
+            """
 
     # Generate HTML content with styling for the second table
     html_content_2 = ""
+    html_content_2 += """
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                        }
+                        th, td {
+                            border: 1px solid #dddddd;
+                            text-align: left;
+                            padding: 10px;
+                        }
+                        th {
+                            background-color: #f2f2f2;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>Terminverteilung</h1>
+                    <table>
+                        <tr>
+                            <th>Arbeiter</th>
+                            <th>AP-Id</th>
+                            <th>Monat</th>
+                            <th>Jahr</th>
+                            <th>Stunden</th>
+                            <th>PM (wird zur Stundenberechnung verwendet: 1 PM = 160 Stunden) </th>
+                        </tr>
+                """
+
+    # sorted_entries = sorted(
+    #    AP.global_data_zettel_infos.items(),  # Sort by worker_id
+    #    key=lambda x: (
+    #        x[0],  # Sort by worker_id (x[0] is the worker_id)
+    #        [entry['AP id'] for entry in x[1]],
+    #        [entry['year'] for entry in x[1]],  # Sort by year (x[1] contains the entries for each worker)
+    #        [entry['month'] for entry in x[1]]  # Sort by month (x[1] contains the entries for each worker)
+    #    )
+    # )
+
+    all_entries = [
+        entry
+        for worker_entries in AP.global_data_zettel_infos.values()
+        for entry in worker_entries
+    ]
+
+    sorted_entries = sorted(
+        all_entries,
+        key=lambda e: (
+            e['worker_id'],
+            ap_id_sort_key(e['AP id']),  # usa parse para ordenar, mas não altera o valor
+            month_map.get(e['month'], 0),  # mês como número
+            e['year'],
+            e['hours']
+        )
+    )
+
+    for entry in sorted_entries:
+        # Extract month, hours, and PM
+        month = entry['month']
+        hours = entry['hours']
+        year = entry['year']
+        AP_id = entry['AP id']
+        worker_id = entry['worker_id']
+
+        if hours == 0:
+            continue
+
+        name = ""
+
+        for wks in worker.list_of_workers:
+            if wks.id == worker_id:
+                name = str(wks.name) + " " + str(wks.surname)
+
+        # Add a row for each entry
+        html_content_2 += f"""
+             <tr>
+                <td>{name}</td>
+                <td>{AP_id}</td>
+                <td>{get_german_month(month)}</td>
+                <td>{year}</td>
+                <td>{round(hours, 2) * 160}</td>
+                <td>{round(hours, 2)}</td>
+            </tr>
+            """
+    html_content_2 += """
+                 </table>
+             </body>
+             </html>
+             """
+
+    # Generate HTML content with styling for the second table
     html_content_2 += """
             <html>
             <head>
@@ -501,115 +631,15 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 </style>
             </head>
             <body>
-                <h1>Terminverteilung</h1>
+                <h1>Monatlicher Arbeiterbericht</h1>
                 <table>
                     <tr>
                         <th>Arbeiter</th>
-                        <th>AP-Id</th>
-                        <th>Monat</th>
-                        <th>Jahr</th>
                         <th>Stunden</th>
-                        <th>PM (wird zur Stundenberechnung verwendet: 1 PM = 160 Stunden) </th>
-                    </tr>
+                        <th>Jahr</th>
+                        <th>Monat</th>
+                     </tr>
             """
-
-    #sorted_entries = sorted(
-    #    AP.global_data_zettel_infos.items(),  # Sort by worker_id
-    #    key=lambda x: (
-    #        x[0],  # Sort by worker_id (x[0] is the worker_id)
-    #        [entry['AP id'] for entry in x[1]],
-    #        [entry['year'] for entry in x[1]],  # Sort by year (x[1] contains the entries for each worker)
-    #        [entry['month'] for entry in x[1]]  # Sort by month (x[1] contains the entries for each worker)
-    #    )
-    #)
-
-    all_entries = [
-        entry
-        for worker_entries in AP.global_data_zettel_infos.values()
-        for entry in worker_entries
-    ]
-
-    sorted_entries = sorted(
-        all_entries,
-        key=lambda e: (
-            e['worker_id'],
-            ap_id_sort_key(e['AP id']),  # usa parse para ordenar, mas não altera o valor
-            month_map.get(e['month'], 0),  # mês como número
-            e['year'],
-            e['hours']
-        )
-    )
-
-
-
-
-    for entry in sorted_entries:
-        # Extract month, hours, and PM
-        month = entry['month']
-        hours = entry['hours']
-        year = entry['year']
-        AP_id = entry['AP id']
-        worker_id = entry['worker_id']
-
-        if hours == 0:
-            continue
-
-        name = ""
-
-        for wks in worker.list_of_workers:
-            if wks.id == worker_id:
-                name = str(wks.name) + " " + str(wks.surname)
-
-        # Add a row for each entry
-        html_content_2 += f"""
-         <tr>
-            <td>{name}</td>
-            <td>{AP_id}</td>
-            <td>{get_german_month(month)}</td>
-            <td>{year}</td>
-            <td>{round(hours,2) * 160}</td>
-            <td>{round(hours,2)}</td>
-        </tr>
-        """
-    html_content_2 += """
-             </table>
-         </body>
-         </html>
-         """
-
-    # Generate HTML content with styling for the second table
-    html_content_2 += """
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                }
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                }
-                th, td {
-                    border: 1px solid #dddddd;
-                    text-align: left;
-                    padding: 10px;
-                }
-                th {
-                    background-color: #f2f2f2;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Monatlicher Arbeiterbericht</h1>
-            <table>
-                <tr>
-                    <th>Arbeiter</th>
-                    <th>Stunden</th>
-                    <th>Jahr</th>
-                    <th>Monat</th>
-                 </tr>
-        """
 
     months_german = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
                      "November", "Dezember"]
@@ -631,20 +661,19 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
                 hours = 1 - wk.hours_available_per_month[year_idx][month_idx]
 
                 html_content_2 += f"""
-                <tr>
-                    <td>{str(wk.name) + " " + str(wk.surname)}</td>
-                    <td>{round(hours,2)}</td>
-                    <td>{int(year)}</td>
-                    <td>{months_german[month_idx]}</td>
-                </tr>
-                """
+                    <tr>
+                        <td>{str(wk.name) + " " + str(wk.surname)}</td>
+                        <td>{round(hours * 40, 2)}</td>
+                        <td>{int(year)}</td>
+                        <td>{months_german[month_idx]}</td>
+                    </tr>
+                    """
 
     html_content_2 += """
-            </table>
-        </body>
-        </html>
-    """
-
+                </table>
+            </body>
+            </html>
+        """
 
     # Save HTML content to a file
     with open("output.html", "w") as file:
@@ -669,35 +698,30 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         # Generate the PDF from the HTML content using pdfkit
         result_1 = io.BytesIO()
         result_2 = io.BytesIO()
-        
+
         pisa.CreatePDF(html_content_1, dest=result_1)
         pdf_output_1 = result_1.getvalue()
-        
+
         pdf_output_2 = pisa.CreatePDF(html_content_2, dest=result_2)
         pdf_output_2 = result_2.getvalue()
 
-        #config = pdfkit.configuration(wkhtmltopdf='/usr/local/bin/wkhtmltopdf')  # typical path on Linux
+        # Create in-memory zip
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr(file_name_1, pdf_output_1)
+            zip_file.writestr(file_name_2, pdf_output_2)
 
-        #pdf_output_1 = pdfkit.from_string(html_content_1, False, configuration=config, options={"enable-local-file-access": ""})
-        #pdf_output_2 = pdfkit.from_string(html_content_2, False, configuration=config, options={"enable-local-file-access": ""})
+        zip_buffer.seek(0)
 
-        
+
         # Create a download button for the generated PDF
         st.download_button(
-            label=file_name_1,
-            data=pdf_output_1,
-            file_name=file_name_1,
-            mime="application/pdf",
-            key="download1"
+            label="Download Both PDFs (ZIP)",
+            data=zip_buffer,
+            file_name="pdfs.zip",
+            mime="application/zip",
         )
 
-        st.download_button(
-            label=file_name_2,
-            data=pdf_output_2,
-            file_name=file_name_2,
-            mime="application/pdf",
-            key="download2"
-        )
     except Exception as e:
         st.error(f"Error generating the PDF: {e}")
 
@@ -744,7 +768,6 @@ if st.button("Run Process"):
                 st.error(f"Error processing the file: {e}")
     else:
         st.error("Please make sure all fields are filled out correctly.")
-
 
 
 
