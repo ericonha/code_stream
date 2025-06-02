@@ -727,7 +727,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
 
 # Streamlit UI
-st.title("Files Reader")
+st.title("AP organizer")
 
 # File upload for AP and Worker files
 ap_file = upload_file("Select Excel File for AP")
@@ -750,7 +750,7 @@ if ap_file:
     entity = st.selectbox("Select Entity", entities[0:-1])
 
 # Input for output file name
-output_name = st.text_input("Enter the name of the file to be saved")
+output_name = st.text_input("Enter the name of the directory to be saved")
 
 import openpyxl
 from io import BytesIO
