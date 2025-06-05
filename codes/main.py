@@ -697,8 +697,8 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         exit(1)
 
     # Convert HTML to PDF
-    file_name_1 = name_of_output_file + "_datum" + "_" + entity + ".pdf"
-    file_name_2 = name_of_output_file + "_organizer" + "_" + entity + ".pdf"
+    file_name_1 = "datum" + "_" + entity + ".pdf"
+    file_name_2 = "organizer" + "_" + entity + ".pdf"
 
     try:
         # Generate the PDF from the HTML content using pdfkit
