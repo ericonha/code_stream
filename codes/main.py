@@ -724,7 +724,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
         st.download_button(
             label="Download Both PDFs (ZIP)",
             data=zip_buffer,
-            file_name="pdfs.zip",
+            file_name= name_of_output_file + ".zip",
             mime="application/zip",
         )
 
