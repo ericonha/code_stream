@@ -357,8 +357,14 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
     for w, wh, dates_st, dates_ft, Nr, id in zip(restored_workers, restored_hours, restored_start, restored_end,
                                                  restored_Nrs, restored_ids):
+        if w.id != 0:
+            color = "#ccffcc"  # verde claro
+        else:
+            color = "red"  # vermelho
+            ap_not_distribute.append(str(id))
+            sum_test += round(wh,2)
         html_content_1 += f"""
-                                    <tr style="background-color: {"#ccffcc"};">
+                                    <tr style="background-color: {color};">
                                         <td>{id}</td>
                                         <td>{Nr}</td>
                                         <td>{dates_st}</td>
