@@ -736,18 +736,18 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 st.title("AP organizer")
 
 # File upload for AP and Worker files
-ap_file = upload_file("Select Excel File for AP")
-worker_file = upload_file("Select Excel File for Worker")
+ap_file = upload_file("Arbeitsplan erfassen")
+worker_file = upload_file("Firmenspezifische Personalkosten erfassen")
 
 if ap_file is not None:
-    st.write(f"Selected AP file: {ap_file.name}")
+    st.write(f"Arbeitsplan erfasst: {ap_file.name}")
 else:
-    st.write("No AP file selected.")
+    st.write("Arbeitsplan erfasst.")
 
 if worker_file is not None:
-    st.write(f"Selected Worker file: {worker_file.name}")
+    st.write(f"Firmenspezifische Personalkosten erfasst: {worker_file.name}")
 else:
-    st.write("No Worker file selected.")
+    st.write("keine Firmenspezifische Personalkosten erfasst.")
 
 # When an AP file is uploaded, dynamically load entity names for dropdown
 if ap_file:
