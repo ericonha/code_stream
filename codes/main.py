@@ -733,7 +733,7 @@ def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
 
 
 # Streamlit UI
-st.title("AP organizer")
+st.title("Arbeitsplan organizer")
 
 # File upload for AP and Worker files
 ap_file = upload_file("Arbeitsplan erfassen")
@@ -742,7 +742,7 @@ worker_file = upload_file("Firmenspezifische Personalkosten erfassen")
 if ap_file is not None:
     st.write(f"Arbeitsplan erfasst: {ap_file.name}")
 else:
-    st.write("Arbeitsplan erfasst.")
+    st.write("Keine Arbeitsplan erfasst.")
 
 if worker_file is not None:
     st.write(f"Firmenspezifische Personalkosten erfasst: {worker_file.name}")
