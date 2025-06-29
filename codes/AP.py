@@ -446,7 +446,7 @@ def max_consecutive_months_worker_can_work(w, start_date, end_date, first_year, 
                 # If worker stops due to lack of available hours after starting, break the loop
                 if worked_consecutively:
                     # If the worker worked continuously but didn't reach the required hours, continue working
-                    while len(hours_list) < total_months:
+                    while len(hours_list) < total_months and (current_date + relativedelta(months=1)) < end_date:
                         hours_list.append(0)
                         current_date += relativedelta(months=1)
                         months.append(current_date)
@@ -517,11 +517,15 @@ def choose_workers(start_date, end_date, required_hours, first_year, last_year, 
             if remaining_hours <= 0:
                 break
 
+            if AP_id == "11.8":
+                print("hello")
+
             # how many months can this worker work
             max_months, hours_list, dates = max_consecutive_months_worker_can_work(w, current_date,
                                                                                    finishing_date,
                                                                                    first_year,
                                                                                    remaining_hours, False)
+
 
             if remaining_hours - sum(hours_list) == 0:
                 work_distribution.append(w)
