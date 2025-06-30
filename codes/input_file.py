@@ -317,7 +317,7 @@ def get_dates(filepath):
     indexs_end = []
     comparator_color = 0
 
-    first_color = fs.cell(column=8, row=6).fill.start_color.index
+    first_color = fs.cell(column=8, row=7).fill.start_color.index
 
     if first_color == 9:
         comparator_color = 8
@@ -444,7 +444,7 @@ def get_dates_unix(df, lista):
 
     temp_array = []
     for m in months:
-        if str(m) != 'nan':
+        if str(m) != 'nan' and get_month_num(m) is not None:
             temp_array.append(m)
     months = temp_array
 
