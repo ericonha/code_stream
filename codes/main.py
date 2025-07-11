@@ -5,6 +5,7 @@ import os
 import tempfile
 import zipfile
 import random
+import io
 
 import worker
 import assignments
@@ -50,11 +51,12 @@ def main():
 
     if valid_inputs:
         if st.button("🚀 Optimierung starten"):
-            df_ap = pd.read_excel(ap_file, header=None)
+            ap_bytes = ap_file.read()
+            df_ap = pd.read_excel(io.BytesIO(ap_bytes), header=None)
             df_workers = pd.read_excel(worker_file)
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_ap_file:
-                tmp_ap_file.write(ap_file.read())
+                tmp_ap_file.write(ap_bytes)
                 tmp_ap_path = tmp_ap_file.name
 
             aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, Filepath=tmp_ap_path)
