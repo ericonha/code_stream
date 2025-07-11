@@ -1,780 +1,128 @@
-import os
-from io import BytesIO
-import io
-import openpyxl
-import pandas as pd
-import input_file
-import numpy as np
-import worker
-import AP
-import pdfkit
 import streamlit as st
-from datetime import datetime
-import shutil
-from xhtml2pdf import pisa
+import pandas as pd
 import copy
+import os
+import tempfile
 import zipfile
-
-
-def calculate_proj_cost(years, hours_year_work_every_one):
-    # Add rows for sum worker data
-    cost_project = 0
-    for i in range(len(years)):
-        for j in range(len(worker.list_of_workers)):
-            cost_project += round(float(hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]) * \
-                            worker.list_of_workers[j].salary,2)
-    return cost_project
-
-
-def round_0_25(duration):
-    duration = round_down_0_05(duration)
-
-    if round(duration * 4) / 4 != duration:
-        comparator = 0
-        while comparator <= duration:
-            comparator += 0.25
-        return comparator
-    return duration
-
-
-def round_down_0_05(number):
-    str_number = str(number)
-    decimal_part = str_number.split(".")[-1]
-
-    # Check if the number has more than one decimal place
-    if len(decimal_part) > 1:
-        return int(number * 20) / 20
-    else:
-        return number
-
-
-def get_german_month(english_month):
-    months = {
-        "January": "Januar",
-        "February": "Februar",
-        "March": "März",
-        "April": "April",
-        "May": "Mai",
-        "June": "Juni",
-        "July": "Juli",
-        "August": "August",
-        "September": "September",
-        "October": "Oktober",
-        "November": "November",
-        "December": "Dezember"
-    }
-    return months.get(english_month, "Invalid month")
-
-
-month_map = {
-    'January': 1, 'February': 2, 'March': 3, 'April': 4,
-    'May': 5, 'June': 6, 'July': 7, 'August': 8,
-    'September': 9, 'October': 10, 'November': 11, 'December': 12
-}
-
-
-# Só para ordenação: converte '3.1' → (3, 1), mas sem modificar o valor original
-def ap_id_sort_key(ap_id_str):
-    return tuple(map(int, ap_id_str.split('.')))
-
-
-def value_to_color(value):
-    """Return a color based on the value. Near 0 is red, in the middle is blue, near 1 is green."""
-    # Ensure value is between 0 and 1
-    value = max(0, min(1, value))
-
-    if value < 0.5:
-        red = int((1 - value * 2) * 255)
-        blue = int(value * 2 * 255)
-        return f"rgb({red}, 0, {blue})"
-    else:
-        blue = int((1 - value) * 2 * 255)
-        green = int((value - 0.5) * 2 * 255)
-        return f"rgb(0, {green}, {blue})"
-
-
-def format_euros(amount):
-    return '€{:,.2f}'.format(amount)
-
-
-def allocate_value(array, start_date, end_date, worker_id, value, years):
-    # Convert start and end dates to datetime objects
-    start_date = datetime.strptime(start_date, "%d.%m.%Y")
-    end_date = datetime.strptime(end_date, "%d.%m.%Y")
-
-    # Get the total number of days between start and end dates
-    total_days = (end_date - start_date).days + 1
-
-    # Loop over each year and calculate the value allocation
-    for year in years:
-        # Calculate the start and end dates of the current year
-        year_int = int(year)
-        year_start = datetime(year_int, 1, 1)
-        year_end = datetime(year_int, 12, 31)
-
-        # Determine the overlap of the year with the given start and end dates
-        overlap_start = max(start_date, year_start)
-        overlap_end = min(end_date, year_end)
-
-        # Calculate the number of overlapping days in the year
-        overlapping_days = (overlap_end - overlap_start).days + 1
-        if overlapping_days > 0:
-            # Calculate the portion of the value for this year
-            year_allocation = (overlapping_days / total_days) * value
-            # Assign the calculated value to the array
-            year_index = int(int(year) - years[0])
-            array[worker_id - 1][year_index] += year_allocation
-
-    return array
-
-
-# Add custom CSS for Streamlit to style the elements
-st.markdown("""
-    <style>
-        .title {
-            font-size: 24px;
-            font-weight: bold;
-            color: #333;
-            text-align: center;
-        }
-        .button {
-            background-color: #008CBA;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            cursor: pointer;
-            border-radius: 3px;
-            font-size: 14px;
-        }
-        .button:hover {
-            background-color: #007B9A;
-        }
-        .input {
-            font-size: 14px;
-            padding: 10px;
-            border-radius: 3px;
-            border: 1px solid #ccc;
-            margin-top: 10px;
-        }
-        .label {
-            font-size: 14px;
-            color: #333;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-
-# Functions to handle file selection and file paths
-def upload_file(label):
-    uploaded_file = st.file_uploader(label, type=["xlsx"])
-    if uploaded_file is not None:
-        return uploaded_file
-    return None
-
-
-def run_process(df, filepath, filepath_workers, name_of_output_file, entity):
-    # create instance of AP to access functions
-    ap1 = AP.AP()
-
-    # get path to file PM and Workers
-    input_file.get_arbeitspaket(df)
-    input_file.get_all_names(df)
-
-    # get in which colum each pms starts
-    lista = input_file.get_dates(filepath)
-
-    # get when each pm starts and ends, how many months per working year and in which year each pm starts and ends
-    list_datas, lista_months, list_begin, list_end = input_file.get_dates_unix(df, lista)
-
-    # input_file.get_color_of_company(df,filepath,entity)
-
-    lista_datas_not_to_change = list_datas
-
-    # save dates
-    ap1.add_dates(list_datas[0], list_datas[1])
-
-    # get which PM id this company will have to do
-    ap1.get_hours(input_file.get_Company(df, entity))
-
-    # get all the id PM titles names and take the first ad last one out (may refactor this later)
-    ap1.Nr = input_file.get_arbeitspaket(df)
-    ap1.Nr = ap1.Nr[1:]
-    # ap1.Nr = ap1.Nr[0:-1]
-
-    # get ids of pm
-    ids = input_file.get_nrs(df)
-
-    # clear workers info
-    worker.list_of_workers.clear()
-
-    # get workers hours
-    input_file.get_workers_info(filepath_workers, lista_months)
-
-    # sorte the worker from most expensive to least
-    worker.sorte_workers()
-
-    repeted_wh_ids = []
-
-    # Check if intervals span across multiple years
-    ap1.check_if_same_years(ids, repeted_wh_ids, list_begin, list_end)
-
-    # get start and end year and save on ap1.year_start, ap1.year_end
-    ap1.get_smallest_year()
-    ap1.get_biggest_year()
-
-    # cleaning dict for zettel infos
-    AP.global_data_zettel_infos.clear()
-
-    hours_year_work_every_one = []
-    worker_hours = []
-    for wk in worker.list_of_workers:
-        worker_hours = []
-        for i in range(0, ap1.year_end - ap1.year_start + 1):
-            worker_hours.append(float(wk.hours_available[i].item()))
-        hours_year_work_every_one.append(worker_hours)
-
-    pre_define_workers = input_file.get_workers_pre_defined(df)
-
-    years = np.linspace(ap1.year_start, ap1.year_end, ap1.year_end - ap1.year_start + 1)
-    list_aps = []
-    dict_aps_infos = {}
-    cost = 0
-
-    for times in range(100):
-
-        # clear workers info
-        worker.list_of_workers.clear()
-
-        # get workers hours
-        input_file.get_workers_info(filepath_workers, lista_months)
-
-        # sorte the worker from most expensive to least
-        worker.sorte_workers()
-
-        New_Nrs, New_ids, New_year_start, New_year_end, New_pre_define_workers, New_hours, Shuffle_to_Original_Index = AP.shuffle_aligned_lists(
-            ap1.Nr, ids, lista_datas_not_to_change[0], lista_datas_not_to_change[1], pre_define_workers, ap1.hours)
-
-        h, ids_check, Nrs, pre_def = ap1.get_workers([New_year_start, New_year_end], New_ids, ap1.year_start,
-                                                     ap1.year_end, New_Nrs,
-                                                     entity,
-                                                     df, New_pre_define_workers, New_hours)
-
-        # h, ids_check, Nrs, pre_def = ap1.get_workers(lista_datas_not_to_change, ids, ap1.year_start, ap1.year_end, ap1.Nr,
-        #                                             entity,
-        #                                             df, pre_define_workers, ap1.hours)
-
-        cost_this_version = calculate_proj_cost(years, hours_year_work_every_one)
-
-        if cost_this_version > cost:
-            cost = cost_this_version
-            list_aps.clear()
-            list_aps = AP.order_aps.copy()
-            dict_aps_infos = copy.deepcopy(AP.global_data_zettel_infos)
-        AP.order_aps.clear()
-        AP.global_data_zettel_infos.clear()
-
-    # For example, reconstruct data arrays
-    AP.order_aps = list_aps
-    AP.global_data_zettel_infos = dict_aps_infos
-    order_aps_final = sorted(AP.order_aps, key=lambda x: tuple(map(float, x[1].split("."))))
-
-    restored_Nrs = [x[0] for x in order_aps_final]
-    restored_ids = [x[1] for x in order_aps_final]
-    restored_start = [x[2] for x in order_aps_final]
-    restored_end = [x[3] for x in order_aps_final]
-    restored_dates = [x[4] for x in order_aps_final]
-    restored_hours = [x[5] for x in order_aps_final]
-    restored_workers = [x[6] for x in order_aps_final]
-
-    html_content_1 = """
-        <html lang="de">
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    margin: 20px;
-                }
-                h1 {
-                    color: #333;
-                    text-align: center;
-                }
-                table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    margin-bottom: 20px;
-                    table-layout: fixed;
-                }
-                th, td {
-                    border: 1px solid #ddd;
-                    padding: 8px;
-                    text-align: left;
-                    overflow: hidden;
-                    white-space: normal;
-                    word-break: normal;      /* Only break at natural points */
-                    hyphens: auto;           /* Allow hyphenation */
-                }
-                th {
-                    background-color: #f2f2f2;
-                    color: #333;
-                }
-                tr:nth-child(even) {
-                    background-color: #f9f9f9;
-                }
-                tr:hover {
-                    background-color: #f5f5f5;
-                }
-                td:nth-child(2) {
-                    font-size: 12px;  /* Adjust the font size as needed */
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Arbeitspaketbericht</h1>
-            <table>
-                <colgroup>
-                    <col style="width:10%">    <!-- Id -->
-                    <col style="width:37%">   <!-- AP (WIDER) -->
-                    <col style="width:17%">   <!-- Startdatum -->
-                    <col style="width:17%">   <!-- Enddatum -->
-                    <col style="width:10%">    <!-- Id Arbeiter -->
-                    <col style="width:8%">    <!-- WH -->
-                </colgroup>
-                <tr>
-                    <th>Id</th>
-                    <th>AP</th>
-                    <th>Startdatum</th>
-                    <th>Enddatum</th>
-                    <th>Id Arbeiter</th>
-                    <th>WH</th>
-                </tr>
-        """
-
-    sum_test = 0
-    sum_test2 = 0
-    ap_not_distribute = []
-    array_working_hours_per_year = np.zeros((len(worker.list_of_workers), len(years)))
-
-    for w, wh, dates_st, dates_ft, Nr, id in zip(restored_workers, restored_hours, restored_start, restored_end,
-                                                 restored_Nrs, restored_ids):
-        if w.id != 0:
-            color = "#ccffcc"  # verde claro
-        else:
-            color = "red"  # vermelho
-            ap_not_distribute.append(str(id))
-            sum_test += round(wh,2)
-        html_content_1 += f"""
-                                    <tr style="background-color: {color};">
-                                        <td>{id}</td>
-                                        <td>{Nr}</td>
-                                        <td>{dates_st}</td>
-                                        <td>{dates_ft}</td>
-                                        <td>{w.id}</td>
-                                        <td>{round(wh, 2)}</td>
-                                    </tr>
-                            """
-    html_content_1 += """
-                        </table>
-                        <div style="page-break-before: always;"></div>
-                    </body>
-                    """
-
-    # Generate HTML content with styling for the second table
-    html_content_1 += """
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    th, td {
-                        border: 1px solid #dddddd;
-                        text-align: left;
-                        padding: 10px;
-                        font-size: 12px;
-                    }
-                    th {
-                        background-color: #f2f2f2;
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>Summen arbeiterbericht</h1>
-                <table>
-                    <tr>
-                        <th>Jahr</th>
-            """
-
-    for i in range(len(worker.list_of_workers)):
-        html_content_1 += f"""
-                            <th>Summen arbeiter {i + 1}</th>
-                """
-    html_content_1 += f"""
-                    </tr>
-            """
-
-    p_p_y = np.array(lista_months) / 12
-
-    sum_t = 0
-    cost_project = 0
-
-    new_array = []
-    new_array_hours = []
-    while len(worker.list_of_workers) != 0:
-        lowest_index_elem = worker.Worker(1000, 0, 0, 0, "", "", 0)
-        for element in worker.list_of_workers:
-            if element.id < lowest_index_elem.id:
-                lowest_index_elem = element
-        new_array.append(lowest_index_elem)
-        index = worker.list_of_workers.index(lowest_index_elem)
-        new_array_hours.append(hours_year_work_every_one[index])
-
-        worker.list_of_workers.remove(lowest_index_elem)
-        hours_year_work_every_one.remove(hours_year_work_every_one[index])
-
-    worker.list_of_workers = new_array
-    hours_year_work_every_one = new_array_hours
-
-    # Add rows for sum worker data
-    for i in range(len(years)):
-        html_content_1 += f"<tr>"
-        html_content_1 += f"<td>{int(years[i])}</td>"
-        for j in range(len(worker.list_of_workers)):
-            html_content_1 += f"<td>{round((hours_year_work_every_one[j][i]) - (worker.list_of_workers[j].hours_available[i][0]), 2)}</td>"
-            sum_t += hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]
-            cost_project += round(
-                float(hours_year_work_every_one[j][i] - worker.list_of_workers[j].hours_available[i][0]) * \
-                worker.list_of_workers[j].salary, 2)
-        html_content_1 += f"</tr>"
-
-    # Add a row for total hours
-    html_content_1 += "<tr>"
-    html_content_1 += "<td><strong>Total</strong></td>"
-
-    workers_total_hours = []
-    index_year = 0
-
-    for workers_t in worker.list_of_workers:
-        w_hours = []
-        for index_ele in range(len(workers_t.hours_available)):
-            w_hours.append(workers_t.hours_available[index_ele][0])
-        workers_total_hours.append(w_hours)
-
-    total_w = []
-    for index_ele in range(len(workers_total_hours)):
-        total_w.append(sum(np.array(hours_year_work_every_one[index_ele]) - np.array(workers_total_hours[index_ele])))
-
-    # Add totals for each worker
-    for total in total_w:
-        html_content_1 += f"<td><strong>{round(total, 2)}</strong></td>"
-
-    # Close the table and HTML body for the second table
-    html_content_1 += """
-                </table>
-                <table>
-                    <tr>
-                       <th>Summe der Gesamtstunden</th>
-                       <th>Stunden nicht verteilt</th>
-                       <th>APs nicht verteilt</th>
-                       <th>Projektkosten</th>
-                       <th>Anzahl der APs</th>
-                    </tr>
-            """
-
-    sum_t_b = sum_t
-    cost_project_formatted = format_euros(cost_project)
-    aps_str = ""
-
-    for aps in ap_not_distribute:
-        aps_str += aps
-        aps_str += ", "
-
-    aps_str = aps_str[:-2]
-
-    if aps_str == "":
-        aps_str = "Alle APs verteilt"
-
-    html_content_1 += f"""
-                <tr>
-                    <td>{round(sum_t_b, 2)}</td>
-                    <td>{sum_test}</td>
-                    <td>{aps_str}</td>
-                    <td>{cost_project_formatted}</td>
-                    <td>{len(h)}</td>
-                </tr>
-            """
-
-    html_content_1 += """
-            </table>
-            </body>
-            </html>
-            """
-
-    # Generate HTML content with styling for the second table
-    html_content_2 = ""
-    html_content_2 += """
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <style>
-                        body {
-                            font-family: Arial, sans-serif;
-                        }
-                        table {
-                            width: 100%;
-                            border-collapse: collapse;
-                        }
-                        th, td {
-                            border: 1px solid #dddddd;
-                            text-align: left;
-                            padding: 10px;
-                        }
-                        th {
-                            background-color: #f2f2f2;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <h1>Terminverteilung</h1>
-                    <table>
-                        <tr>
-                            <th>Arbeiter</th>
-                            <th>AP-Id</th>
-                            <th>Monat</th>
-                            <th>Jahr</th>
-                            <th>Stunden</th>
-                            <th>PM (wird zur Stundenberechnung verwendet: 1 PM = 160 Stunden) </th>
-                        </tr>
-                """
-
-    # sorted_entries = sorted(
-    #    AP.global_data_zettel_infos.items(),  # Sort by worker_id
-    #    key=lambda x: (
-    #        x[0],  # Sort by worker_id (x[0] is the worker_id)
-    #        [entry['AP id'] for entry in x[1]],
-    #        [entry['year'] for entry in x[1]],  # Sort by year (x[1] contains the entries for each worker)
-    #        [entry['month'] for entry in x[1]]  # Sort by month (x[1] contains the entries for each worker)
-    #    )
-    # )
-
-    all_entries = [
-        entry
-        for worker_entries in AP.global_data_zettel_infos.values()
-        for entry in worker_entries
-    ]
-
-    sorted_entries = sorted(
-        all_entries,
-        key=lambda e: (
-            e['worker_id'],
-            ap_id_sort_key(e['AP id']),  # usa parse para ordenar, mas não altera o valor
-            month_map.get(e['month'], 0),  # mês como número
-            e['year'],
-            e['hours']
-        )
+import random
+
+import worker
+import assignments
+import html_report
+
+
+def company_in_file(uploaded_file, company: str) -> bool:
+    if uploaded_file is None or not company.strip():
+        return False
+    try:
+        df = pd.read_excel(uploaded_file, header=None)
+        if df.shape[0] <= 3:
+            st.warning("🚫 Die Datei hat weniger als 4 Zeilen – Headerzeile fehlt?")
+            return False
+
+        header_row = df.iloc[3].astype(str).str.strip()
+        return any(company.lower() in col.lower() for col in header_row if isinstance(col, str))
+    except Exception as e:
+        st.error(f"❌ Fehler beim Verarbeiten der Datei: {e}")
+        return False
+
+
+def main():
+    st.set_page_config(page_title="Arbeitsplan Optimierer", layout="centered")
+    st.title("🛠️ Arbeitsplan Optimierer")
+
+    with st.sidebar:
+        st.header("⚙️ Einstellungen")
+        company_name = st.text_input("Firmenname", value="")
+        rounds = st.number_input("Anzahl der Optimierungsdurchläufe", min_value=100, value=100)
+
+    ap_file = st.file_uploader("📄 Arbeitsplan hochladen (Excel)", type=["xlsx"])
+    worker_file = st.file_uploader("👷 Personalkosten hochladen (Excel)", type=["xlsx"])
+
+    # Validate input before allowing optimization
+    valid_inputs = (
+        company_name.strip() != ""
+        and rounds > 0
+        and ap_file is not None
+        and worker_file is not None
+        and company_in_file(ap_file, company_name)
     )
 
-    for entry in sorted_entries:
-        # Extract month, hours, and PM
-        month = entry['month']
-        hours = entry['hours']
-        year = entry['year']
-        AP_id = entry['AP id']
-        worker_id = entry['worker_id']
+    if ap_file and company_name.strip() != "" and not company_in_file(ap_file, company_name):
+        st.warning("⚠️ Firmenname nicht in der Datei gefunden. Bitte überprüfen.")
 
-        if hours == 0:
-            continue
+    if valid_inputs:
+        if st.button("🚀 Optimierung starten"):
+            df_ap = pd.read_excel(ap_file, header=None)
+            df_workers = pd.read_excel(worker_file)
 
-        name = ""
+            # Preprocessing
+            aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, Filepath=ap_file.name)
+            months = worker.month_per_year(df_ap)
+            workers_list_orig = worker.extract_workers_from_dataframe(df_workers, months)
+            start_year = int(aps_list_orig[0].start_date[6:])
 
-        for wks in worker.list_of_workers:
-            if wks.id == worker_id:
-                name = str(wks.name) + " " + str(wks.surname)
+            best_aps_list = None
+            best_workers_list = None
+            best_cost = -1
+            successful_runs = 0
+            found = False
 
-        # Add a row for each entry
-        html_content_2 += f"""
-             <tr>
-                <td>{name}</td>
-                <td>{AP_id}</td>
-                <td>{get_german_month(month)}</td>
-                <td>{year}</td>
-                <td>{round(hours, 2) * 160}</td>
-                <td>{round(hours, 2)}</td>
-            </tr>
-            """
-    html_content_2 += """
-                 </table>
-             </body>
-             </html>
-             """
+            with st.spinner("⏳ Optimierung läuft..."):
+                for i in range(rounds):
+                    aps_list = copy.deepcopy(aps_list_orig)
+                    workers_list = copy.deepcopy(workers_list_orig)
 
-    # Generate HTML content with styling for the second table
-    html_content_2 += """
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    body {
-                        font-family: Arial, sans-serif;
-                    }
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                    }
-                    th, td {
-                        border: 1px solid #dddddd;
-                        text-align: left;
-                        padding: 10px;
-                    }
-                    th {
-                        background-color: #f2f2f2;
-                    }
-                </style>
-            </head>
-            <body>
-                <h1>Monatlicher Arbeiterbericht</h1>
-                <table>
-                    <tr>
-                        <th>Arbeiter</th>
-                        <th>Stunden</th>
-                        <th>Jahr</th>
-                        <th>Monat</th>
-                     </tr>
-            """
+                    # 🔀 Randomize AP order
+                    original_order = {ap.id: idx for idx, ap in enumerate(aps_list)}
+                    random.shuffle(aps_list)
 
-    months_german = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober",
-                     "November", "Dezember"]
+                    for ap in aps_list:
+                        assignments.assign_ap_to_workers(ap, workers_list, start_year)
 
-    last_month = 12
-    for wk in worker.list_of_workers:
-        first_year = 0
-        for year_idx, year in enumerate(years):
-            if first_year == 0:
-                months_to_iterate = 12 - lista_months[0]
-                first_year = 1
-                last_month = 12
+                    # ✅ Restore original AP order
+                    aps_list.sort(key=lambda ap: original_order.get(ap.id, 9999))
+
+                    all_distributed = all("Nicht zugewiesen" not in (ap.assigned_worker_name or "") for ap in aps_list)
+                    total_cost = sum(w.summed_hours_worked_total * w.salary for w in workers_list)
+
+                    if all_distributed:
+                        successful_runs += 1
+                        if total_cost > best_cost:
+                            best_cost = total_cost
+                            best_aps_list = copy.deepcopy(aps_list)
+                            best_workers_list = copy.deepcopy(workers_list)
+                            found = True
+                    elif total_cost > best_cost:
+                        best_cost = total_cost
+                        best_aps_list = copy.deepcopy(aps_list)
+                        best_workers_list = copy.deepcopy(workers_list)
+
+            if best_aps_list:
+                st.success(f"✅ Beste Lösung gefunden ({successful_runs} von {rounds} erfolgreich).")
+
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    ap_pdf = os.path.join(tmpdir, "arbeitspaket_bericht.pdf")
+                    worker_pdf = os.path.join(tmpdir, "mitarbeiter_report.pdf")
+                    zip_path = os.path.join(tmpdir, "berichte.zip")
+
+                    html_report.save_pdf_report(best_aps_list, best_workers_list, ap_pdf, start_year=start_year)
+                    html_report.save_worker_assignment_pdf(best_workers_list, worker_pdf, start_year=start_year)
+
+                    with zipfile.ZipFile(zip_path, "w") as zipf:
+                        zipf.write(ap_pdf, arcname="arbeitspaket_bericht.pdf")
+                        zipf.write(worker_pdf, arcname="mitarbeiter_report.pdf")
+
+                    with open(zip_path, "rb") as f:
+                        st.download_button("📦 ZIP herunterladen", f, file_name="berichte.zip")
+
+                if not found:
+                    st.warning("⚠️ Kein Durchlauf konnte alle APs vollständig zuweisen.")
             else:
-                months_to_iterate = 0
-                last_month = lista_months[year_idx]
-
-            for i in range(months_to_iterate, last_month):
-                month_idx = i
-                hours = 1 - wk.hours_available_per_month[year_idx][month_idx]
-
-                html_content_2 += f"""
-                    <tr>
-                        <td>{str(wk.name) + " " + str(wk.surname)}</td>
-                        <td>{round(hours * 40, 2)}</td>
-                        <td>{int(year)}</td>
-                        <td>{months_german[month_idx]}</td>
-                    </tr>
-                    """
-
-    html_content_2 += """
-                </table>
-            </body>
-            </html>
-        """
-
-    # Save HTML content to a file
-    with open("output.html", "w") as file:
-        file.write(html_content_1)
-
-    with open("output.html", "w") as file:
-        file.write(html_content_2)
-
-    if len(name_of_output_file) == 0:
-        print("Error name of pdf, it cannot be empty")
-        exit(1)
-
-    if len(name_of_output_file) > 100:
-        print("Error name of pdf, it is way too big")
-        exit(1)
-
-    # Convert HTML to PDF
-    file_name_1 = "datum" + "_" + entity + ".pdf"
-    file_name_2 = "organizer" + "_" + entity + ".pdf"
-
-    try:
-        # Generate the PDF from the HTML content using pdfkit
-        result_1 = io.BytesIO()
-        result_2 = io.BytesIO()
-
-        pisa.CreatePDF(html_content_1, dest=result_1)
-        pdf_output_1 = result_1.getvalue()
-
-        pdf_output_2 = pisa.CreatePDF(html_content_2, dest=result_2)
-        pdf_output_2 = result_2.getvalue()
-
-        # Create in-memory zip
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED) as zip_file:
-            zip_file.writestr(file_name_1, pdf_output_1)
-            zip_file.writestr(file_name_2, pdf_output_2)
-
-        zip_buffer.seek(0)
-
-
-        # Create a download button for the generated PDF
-        st.download_button(
-            label="Download Both PDFs (ZIP)",
-            data=zip_buffer,
-            file_name= name_of_output_file + ".zip",
-            mime="application/zip",
-        )
-
-    except Exception as e:
-        st.error(f"Error generating the PDF: {e}")
-
-
-# Streamlit UI
-st.title("Arbeitsplan organizer")
-
-# File upload for AP and Worker files
-ap_file = upload_file("Arbeitsplan erfassen")
-worker_file = upload_file("Firmenspezifische Personalkosten erfassen")
-
-if ap_file is not None:
-    st.write(f"Arbeitsplan erfasst: {ap_file.name}")
-else:
-    st.write("Keine Arbeitsplan erfasst.")
-
-if worker_file is not None:
-    st.write(f"Firmenspezifische Personalkosten erfasst: {worker_file.name}")
-else:
-    st.write("keine Firmenspezifische Personalkosten erfasst.")
-
-# When an AP file is uploaded, dynamically load entity names for dropdown
-if ap_file:
-    df_ap = input_file.get_file(ap_file)
-    entities = input_file.get_all_names(df_ap)  # Fetch list of entities dynamically from the file
-    entity = st.selectbox("Select Entity", entities[0:-1])
-
-# Input for output file name
-output_name = st.text_input("Enter the name of the directory to be saved")
-
-import openpyxl
-from io import BytesIO
-
-# Run button for processing
-if st.button("Run Process"):
-    if ap_file and worker_file and entity != "Company/University/Hochschule" and output_name:
-        if ap_file is not None:
-            # Read the file into a pandas DataFrame
-            try:
-                # Read the .xlsx file directly from the uploaded file
-                df = pd.read_excel(ap_file)
-                run_process(df, ap_file, worker_file, output_name, entity)
-            except Exception as e:
-                st.error(f"Error processing the file: {e}")
+                st.error("❌ Keine gültige Lösung gefunden.")
     else:
-        st.error("Please make sure all fields are filled out correctly.")
+        st.info("⬅️ Bitte Firmenname eingeben, beide Dateien hochladen und sicherstellen, dass die Firma im AP enthalten ist.")
 
 
-
-
+if __name__ == "__main__":
+    main()
