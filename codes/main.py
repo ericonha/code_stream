@@ -52,9 +52,12 @@ def main():
     if valid_inputs:
         if st.button("🚀 Optimierung starten"):
             ap_bytes = ap_file.read()
+
+            # Usar os bytes para pandas
             df_ap = pd.read_excel(io.BytesIO(ap_bytes), header=None)
             df_workers = pd.read_excel(worker_file)
 
+            # E também salvar para openpyxl
             with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_ap_file:
                 tmp_ap_file.write(ap_bytes)
                 tmp_ap_path = tmp_ap_file.name
