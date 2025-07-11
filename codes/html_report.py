@@ -1,6 +1,10 @@
-from weasyprint import HTML
+from xhtml2pdf import pisa
 from typing import List
 from worker import WorkPackage, Worker
+import re
+
+def ap_id_sort_key(ap_id: str):
+    return tuple(int(part) if part.isdigit() else part for part in re.split(r'[^\d]+', ap_id) if part != '')
 
 def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Worker], start_year: int):
     html = """
@@ -8,34 +12,12 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
     <head>
         <meta charset="UTF-8">
         <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 20px;
-                font-size: 13px;
-            }
-            h1, h2 {
-                color: #333;
-                text-align: center;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 30px;
-                table-layout: fixed;
-            }
-            th, td {
-                border: 1px solid #ddd;
-                padding: 6px;
-                text-align: center;
-                word-break: break-word;
-            }
-            th {
-                background-color: #f2f2f2;
-                color: #333;
-            }
-            tr:nth-child(even) {
-                background-color: #f9f9f9;
-            }
+            body { font-family: Arial, sans-serif; margin: 20px; font-size: 13px; }
+            h1, h2 { color: #333; text-align: center; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
+            th, td { border: 1px solid #ddd; padding: 6px; text-align: center; word-break: break-word; }
+            th { background-color: #f2f2f2; color: #333; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
         </style>
     </head>
     <body>
@@ -65,7 +47,6 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
         if total_ids > 1:
             for i, wid in enumerate(ids):
                 name = names[i] if i < len(names) else "?"
-                partial_pm = ap.required_pm / total_ids
                 partial_pm = workers_list[ap.assigned_worker_ids[i]-1].assignment_log_hours_per_ap[ap.id]
                 row_color = "#ffe6e6" if wid == 0 else "#ccffcc"
                 if wid == 0:
@@ -74,7 +55,7 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
                 html += f"""
                 <tr style="background-color:{row_color};">
                     <td>{ap.id}</td>
-                    <td>{ap.title[:11] + "..."}</td>
+                    <td>{ap.title[:11] + '...'}</td>
                     <td>{ap.start_date}</td>
                     <td>{ap.end_date}</td>
                     <td>{wid}</td>
@@ -92,7 +73,7 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
             html += f"""
             <tr style="background-color:{row_color};">
                 <td>{ap.id}</td>
-                <td>{ap.title[:11] + "..."}</td>
+                <td>{ap.title[:11] + '...'}</td>
                 <td>{ap.start_date}</td>
                 <td>{ap.end_date}</td>
                 <td>{wid}</td>
@@ -104,9 +85,6 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
     html += """
             </tbody>
         </table>
-
-        <div style="page-break-before: always;"></div>
-
         <h2>Mitarbeiterstatistik</h2>
         <table>
             <thead>
@@ -178,26 +156,15 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
 
 def save_pdf_report(aps_list: List[WorkPackage], workers: List[Worker], output_path: str = "arbeitspaket_bericht.pdf", start_year: int = 0):
     html_content = generate_full_html_report(aps_list, workers, start_year)
-    HTML(string=html_content).write_pdf(output_path)
-    print(f"✅ PDF saved to: {output_path}")
-
-
-from weasyprint import HTML
-from typing import List
-from worker import Worker
-import re
-
-def ap_id_sort_key(ap_id: str):
-    """Sort AP IDs like '1.1', '1.10', etc., in natural numeric order."""
-    return tuple(int(part) if part.isdigit() else part for part in re.split(r'[^\d]+', ap_id) if part != '')
-
+    with open(output_path, "wb") as file:
+        pisa_status = pisa.CreatePDF(html_content, dest=file)
+    if pisa_status.err:
+        print("❌ Fehler beim Erzeugen des PDF")
+    else:
+        print(f"✅ PDF gespeichert unter: {output_path}")
 
 def generate_detailed_worker_report_html(workers: List[Worker], start_year: int) -> str:
-    month_names = [
-        "Januar", "Februar", "März", "April", "Mai", "Juni",
-        "Juli", "August", "September", "Oktober", "November", "Dezember"
-    ]
-
+    month_names = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
     html = """
     <html lang="de">
     <head>
@@ -209,29 +176,19 @@ def generate_detailed_worker_report_html(workers: List[Worker], start_year: int)
             th, td { border: 1px solid #ddd; padding: 6px; text-align: center; word-break: break-word; }
             th { background-color: #f2f2f2; color: #333; }
             tr:nth-child(even) { background-color: #f9f9f9; }
-            .page-break { page-break-before: always; }
         </style>
     </head>
     <body>
         <h1>Detaillierter Arbeitsbericht</h1>
     """
 
-    # TABLE 1: Worker, AP-ID, Month, Year, Hours, PM
     rows_ap_view = []
     for worker in workers:
         for (year_idx, month_idx), ap_data in worker.assignment_log.items():
             for ap_id, pm in ap_data:
                 hours = pm * 160
-                rows_ap_view.append((
-                    worker.name + " " + worker.surname,
-                    ap_id,
-                    month_names[month_idx],
-                    start_year + year_idx,
-                    hours,
-                    pm
-                ))
+                rows_ap_view.append((worker.name + " " + worker.surname, ap_id, month_names[month_idx], start_year + year_idx, hours, pm))
 
-    # ✅ Sort by AP-ID using natural sort
     rows_ap_view.sort(key=lambda x: ap_id_sort_key(x[1]))
 
     html += """
@@ -264,9 +221,7 @@ def generate_detailed_worker_report_html(workers: List[Worker], start_year: int)
 
     html += "</tbody></table>"
 
-    # TABLE 2: Per-worker summary per month
     for worker in workers:
-        html += '<div class="page-break"></div>'
         html += f"<h2>Zusammenfassung – {worker.name} {worker.surname}</h2>"
         html += """
         <table>
@@ -279,7 +234,6 @@ def generate_detailed_worker_report_html(workers: List[Worker], start_year: int)
             </thead>
             <tbody>
         """
-
         monthly_totals = {}
         for (year_idx, month_idx), ap_data in worker.assignment_log.items():
             year = start_year + year_idx
@@ -302,11 +256,11 @@ def generate_detailed_worker_report_html(workers: List[Worker], start_year: int)
     html += "</body></html>"
     return html
 
-
 def save_worker_assignment_pdf(workers: List[Worker], output_path: str = "mitarbeiter_bericht.pdf", start_year: int = 0):
     html_content = generate_detailed_worker_report_html(workers, start_year=start_year)
-    HTML(string=html_content).write_pdf(output_path)
-    print(f"✅ Mitarbeiter-PDF gespeichert unter: {output_path}")
-
-
-
+    with open(output_path, "wb") as file:
+        pisa_status = pisa.CreatePDF(html_content, dest=file)
+    if pisa_status.err:
+        print("❌ Fehler beim Erzeugen des Mitarbeiterberichts")
+    else:
+        print(f"✅ Mitarbeiter-PDF gespeichert unter: {output_path}")
