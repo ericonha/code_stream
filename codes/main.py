@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import copy
-import os
-import tempfile
 import zipfile
 import random
 import io
@@ -11,13 +9,14 @@ import worker
 import assignments
 import html_report
 
+
 def company_in_file(uploaded_file, company: str) -> bool:
     if uploaded_file is None or not company.strip():
         return False
     try:
         df = pd.read_excel(uploaded_file, header=None)
         if df.shape[0] <= 3:
-            st.warning("\U0001F6AB Die Datei hat weniger als 4 Zeilen – Headerzeile fehlt?")
+            st.warning("🚫 Die Datei hat weniger als 4 Zeilen – Headerzeile fehlt?")
             return False
 
         header_row = df.iloc[3].astype(str).str.strip()
@@ -26,9 +25,10 @@ def company_in_file(uploaded_file, company: str) -> bool:
         st.error(f"❌ Fehler beim Verarbeiten der Datei: {e}")
         return False
 
+
 def main():
     st.set_page_config(page_title="Arbeitsplan Optimierer", layout="centered")
-    st.title("\U0001F6E0️ Arbeitsplan Optimierer")
+    st.title("🛠️ Arbeitsplan Optimierer")
 
     with st.sidebar:
         st.header("⚙️ Einstellungen")
@@ -51,18 +51,10 @@ def main():
 
     if valid_inputs:
         if st.button("🚀 Optimierung starten"):
-            ap_bytes = ap_file.read()
-
-            # Usar os bytes para pandas
-            df_ap = pd.read_excel(io.BytesIO(ap_bytes), header=None)
+            df_ap = pd.read_excel(ap_file, header=None)
             df_workers = pd.read_excel(worker_file)
 
-            # E também salvar para openpyxl
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_ap_file:
-                tmp_ap_file.write(ap_bytes)
-                tmp_ap_path = tmp_ap_file.name
-
-            aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, Filepath=tmp_ap_path)
+            aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, Filepath=ap_file.name)
             months = worker.month_per_year(df_ap)
             workers_list_orig = worker.extract_workers_from_dataframe(df_workers, months)
             start_year = int(aps_list_orig[0].start_date[6:])
@@ -74,7 +66,7 @@ def main():
             found = False
 
             with st.spinner("⏳ Optimierung läuft..."):
-                for i in range(rounds):
+                for _ in range(rounds):
                     aps_list = copy.deepcopy(aps_list_orig)
                     workers_list = copy.deepcopy(workers_list_orig)
 
@@ -85,7 +77,6 @@ def main():
                         assignments.assign_ap_to_workers(ap, workers_list, start_year)
 
                     aps_list.sort(key=lambda ap: original_order.get(ap.id, 9999))
-
                     all_distributed = all("Nicht zugewiesen" not in (ap.assigned_worker_name or "") for ap in aps_list)
                     total_cost = sum(w.summed_hours_worked_total * w.salary for w in workers_list)
 
@@ -104,20 +95,21 @@ def main():
             if best_aps_list:
                 st.success(f"✅ Beste Lösung gefunden ({successful_runs} von {rounds} erfolgreich).")
 
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    ap_pdf = os.path.join(tmpdir, "arbeitspaket_bericht.pdf")
-                    worker_pdf = os.path.join(tmpdir, "mitarbeiter_report.pdf")
-                    zip_path = os.path.join(tmpdir, "berichte.zip")
+                # Create in-memory PDF buffers
+                ap_pdf_buffer = io.BytesIO()
+                worker_pdf_buffer = io.BytesIO()
 
-                    html_report.save_pdf_report(best_aps_list, best_workers_list, ap_pdf, start_year=start_year)
-                    html_report.save_worker_assignment_pdf(best_workers_list, worker_pdf, start_year=start_year)
+                html_report.save_pdf_report(best_aps_list, best_workers_list, ap_pdf_buffer, start_year=start_year)
+                html_report.save_worker_assignment_pdf(best_workers_list, worker_pdf_buffer, start_year=start_year)
 
-                    with zipfile.ZipFile(zip_path, "w") as zipf:
-                        zipf.write(ap_pdf, arcname="arbeitspaket_bericht.pdf")
-                        zipf.write(worker_pdf, arcname="mitarbeiter_report.pdf")
+                # ZIP everything in-memory
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, "w") as zipf:
+                    zipf.writestr("arbeitspaket_bericht.pdf", ap_pdf_buffer.getvalue())
+                    zipf.writestr("mitarbeiter_report.pdf", worker_pdf_buffer.getvalue())
 
-                    with open(zip_path, "rb") as f:
-                        st.download_button("📦 ZIP herunterladen", f, file_name="berichte.zip")
+                zip_buffer.seek(0)
+                st.download_button("📦 ZIP herunterladen", zip_buffer, file_name="berichte.zip", mime="application/zip")
 
                 if not found:
                     st.warning("⚠️ Kein Durchlauf konnte alle APs vollständig zuweisen.")
@@ -125,6 +117,7 @@ def main():
                 st.error("❌ Keine gültige Lösung gefunden.")
     else:
         st.info("⬅️ Bitte Firmenname eingeben, beide Dateien hochladen und sicherstellen, dass die Firma im AP enthalten ist.")
+
 
 if __name__ == "__main__":
     main()
