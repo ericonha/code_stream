@@ -2,6 +2,10 @@ from xhtml2pdf import pisa
 from typing import List
 from worker import WorkPackage, Worker
 import re
+from typing import List, Union
+from xhtml2pdf import pisa
+import io
+
 
 def ap_id_sort_key(ap_id: str):
     return tuple(int(part) if part.isdigit() else part for part in re.split(r'[^\d]+', ap_id) if part != '')
@@ -154,14 +158,25 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
     html += "</body></html>"
     return html
 
-def save_pdf_report(aps_list: List[WorkPackage], workers: List[Worker], output_path: str = "arbeitspaket_bericht.pdf", start_year: int = 0):
+def save_pdf_report(
+    aps_list: List[WorkPackage],
+    workers: List[Worker],
+    output: Union[str, io.BytesIO] = "arbeitspaket_bericht.pdf",
+    start_year: int = 0
+):
     html_content = generate_full_html_report(aps_list, workers, start_year)
-    with open(output_path, "wb") as file:
-        pisa_status = pisa.CreatePDF(html_content, dest=file)
+
+    if isinstance(output, io.BytesIO):
+        pisa_status = pisa.CreatePDF(html_content, dest=output)
+        output.seek(0)
+    else:
+        with open(output, "wb") as file:
+            pisa_status = pisa.CreatePDF(html_content, dest=file)
+
     if pisa_status.err:
         print("❌ Fehler beim Erzeugen des PDF")
     else:
-        print(f"✅ PDF gespeichert unter: {output_path}")
+        print("✅ PDF erfolgreich erzeugt.")
 
 def generate_detailed_worker_report_html(workers: List[Worker], start_year: int) -> str:
     month_names = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
@@ -256,11 +271,25 @@ def generate_detailed_worker_report_html(workers: List[Worker], start_year: int)
     html += "</body></html>"
     return html
 
-def save_worker_assignment_pdf(workers: List[Worker], output_path: str = "mitarbeiter_bericht.pdf", start_year: int = 0):
+from typing import List, Union
+from xhtml2pdf import pisa
+import io
+
+def save_worker_assignment_pdf(
+    workers: List[Worker],
+    output: Union[str, io.BytesIO] = "mitarbeiter_bericht.pdf",
+    start_year: int = 0
+):
     html_content = generate_detailed_worker_report_html(workers, start_year=start_year)
-    with open(output_path, "wb") as file:
-        pisa_status = pisa.CreatePDF(html_content, dest=file)
-    if pisa_status.err:
-        print("❌ Fehler beim Erzeugen des Mitarbeiterberichts")
+
+    if isinstance(output, io.BytesIO):
+        pisa_status = pisa.CreatePDF(html_content, dest=output)
+        output.seek(0)
     else:
-        print(f"✅ Mitarbeiter-PDF gespeichert unter: {output_path}")
+        with open(output, "wb") as file:
+            pisa_status = pisa.CreatePDF(html_content, dest=file)
+
+    if pisa_status.err:
+        print("❌ Fehler beim Erzeugen des PDF")
+    else:
+        print("✅ PDF erfolgreich erzeugt.")
