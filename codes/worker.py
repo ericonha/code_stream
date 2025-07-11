@@ -1,107 +1,386 @@
+# models/worker.py
+import math
+from dataclasses import dataclass, field
 import numpy as np
+from dataclasses import dataclass
+from typing import Optional, List, Tuple
+import pandas as pd
+from openpyxl.utils import range_boundaries
+from openpyxl import load_workbook
+from calendar import monthrange
+from typing import List, Tuple, Dict
 
-list_of_workers = []
-list_of_av_worker = []
-
-
+@dataclass
 class Worker:
+    id: int
+    name: str
+    surname: str
+    salary: float  # €/hour
+    perc_year: List[float]  # % availability per year
+    pm_per_ap: float
+    years: int  # number of years to cover
+    step: float
+
+    hours_available: np.ndarray = field(init=False)
+    hours_available_per_month: np.ndarray = field(init=False)
+    summed_hours_worked_per_year: np.ndarray = field(init=False)
+    summed_hours_worked_total: float = field(init=False)
+
+    assignment_log: Dict[Tuple[int, int], List[Tuple[int, float]]] = field(init=False)
+    assignment_log_hours_per_ap: Dict[str, float] = field(init=False)
+
+    def __post_init__(self):
+        self.hours_available = np.zeros((self.years, 1))
+        self.hours_available_per_month = np.zeros((self.years, 12))
+        self.summed_hours_worked_per_year = np.zeros(self.years)
+        self.summed_hours_worked_total = 0.0
+        self.assignment_log = {}
+        self.assignment_log_hours_per_ap = {}
+
+    def set_availability(self, months: List[int], hours_per_year: List[float]):
+        for i in range(self.years):
+            self.hours_available[i][0] = hours_per_year[i] * (months[i] / 12)
+            for m in range(months[i]):
+                self.hours_available_per_month[i][m] = 1
+
+    def is_available(self, year: int, month: int, step:float) -> bool:
+        return self.hours_available_per_month[year, month] > step
+
+    def print_infos(self):
+        print(self.id)
+        print(self.name)
+        print(self.surname)
+        print(self.salary)
+
+def extract_workers_from_dataframe(df: pd.DataFrame, months) -> List[Worker]:
+    header_row_clean = df.iloc[0].astype(str).str.strip()
+    df_data = df[1:]
+
+    def find_col_index(target: str) -> int:
+        for i, col in enumerate(header_row_clean):
+            if target.lower() in col.lower():
+                return i
+        raise ValueError(f"Column containing '{target}' not found.")
+
+    pm_indices = [
+        i for i, val in enumerate(header_row_clean)
+        if isinstance(val, str) and val.strip() and "max pms per year" in val.lower()
+    ]
+    perc_year_idx = find_col_index("% per year")
+    salary_idx = find_col_index("Salary")
+    pm_per_ap_idx = find_col_index("PM/AP")
+
+    workers = []
+
+    for _, row in df_data.iterrows():
+        try:
+            worker_id = int(row.iloc[0])
+            name = str(row.iloc[1])
+            surname = str(row.iloc[2])
+            step = float(row.iloc[-1]) if not pd.isnull(row.iloc[-1]) else 0.1
+
+            pm_per_year = [float(row.iloc[i]) for i in pm_indices if not pd.isna(row.iloc[i])]
+            if not pm_per_year:
+                continue  # skip workers with no PMs
+
+            perc_year = [float(row.iloc[perc_year_idx])] * len(pm_per_year)
+            salary = float(row.iloc[salary_idx])
+            pm_per_ap = float(row.iloc[pm_per_ap_idx]) if not pd.isna(row.iloc[pm_per_ap_idx]) else 10.0
+
+            w = Worker(
+                id=worker_id,
+                name=name,
+                surname=surname,
+                salary=salary,
+                perc_year=perc_year,
+                pm_per_ap=pm_per_ap,
+                years=len(pm_per_year),
+                step=step
+            )
+            w.set_availability(
+                months=[12] * len(pm_per_year),
+                hours_per_year=[pm for pm in pm_per_year]
+            )
+
+            index = 0
+            for m in months:
+                w.hours_available[index] =  w.hours_available[index] * len(months[m])/12
+                index += 1
+
+            workers.append(w)
+
+        except Exception as e:
+            print(f"Skipping row due to error: {e}")
+
+    return workers
+
+@dataclass
+class WorkPackage:
+    id: str
+    title: str
+    required_pm: float
+    assigned_worker_name: Optional[str] = None
+    assigned_worker_id: Optional[int] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+    def print_infos(self):
+        print(f"[AP {self.id}] '{self.title}' | PM: {self.required_pm} | "
+              f"Start: {self.start_date or 'N/A'} | End: {self.end_date or 'N/A'} | "
+              f"Worker ID: {self.assigned_worker_id or '—'} | Name: {self.assigned_worker_name or '—'}")
+
+def extract_work_packages_from_dataframe(df: pd.DataFrame, company: str, Filepath: str) -> List[WorkPackage]:
+    aps: List[WorkPackage] = []
+
+    header_row = df.iloc[3].astype(str).str.strip()
+
+    try:
+        company_col_idx = next(
+            i for i, col in enumerate(header_row)
+            if company.lower() in col.lower()
+        )
+    except StopIteration:
+        print(f"❌ Company '{company}' not found in the Excel header row.")
+        return []
+
+    month_col_map = extract_ap_date_ranges(Filepath,company)
+    index_ap = 0
+
+    for _, row in df.iloc[4:].iterrows():
+        ap_id_raw = row.iloc[1]
+
+        if pd.isna(ap_id_raw):
+            continue
+
+        ap_id_str = str(ap_id_raw).strip()
+
+        if len(month_col_map)==index_ap :
+            break
+
+        try:
+            if float(ap_id_str).is_integer():
+                continue
+        except ValueError:
+            pass
+
+        title = str(row.iloc[2]).strip() if not pd.isna(row.iloc[2]) else ""
+
+        try:
+            required_pm = float(row.iloc[company_col_idx])
+        except Exception:
+            required_pm = 0.0
+
+        if required_pm <= 0 or math.isnan(required_pm):
+            continue
+
+        assigned_worker = row.iloc[6] if not pd.isna(row.iloc[6]) else None
+
+        ap = WorkPackage(
+            id=ap_id_str,
+            title=title,
+            required_pm=required_pm,
+            assigned_worker_name=str(assigned_worker).strip() if assigned_worker else None,
+            start_date=month_col_map[index_ap][0],
+            end_date=month_col_map[index_ap][1],
+        )
+        index_ap += 1
+        aps.append(ap)
+
+    return aps
+
+MONTH_MAP = {
+    "jan": 1, "januar": 1,
+    "feb": 2, "februar": 2,
+    "mar": 3, "märz": 3, "maerz": 3, "mrz": 3,
+    "apr": 4, "april": 4,
+    "mai": 5,
+    "jun": 6, "juni": 6,
+    "jul": 7, "juli": 7,
+    "aug": 8, "august": 8,
+    "sep": 9, "sept": 9, "september": 9,
+    "okt": 10, "oct": 10, "oktober": 10,
+    "nov": 11, "november": 11,
+    "dez": 12, "dec": 12, "dezember": 12
+}
+
+def month_str_to_number(month_str: str) -> int:
+    key = str(month_str).strip().lower()
+    if key in MONTH_MAP:
+        return MONTH_MAP[key]
+    else:
+        raise ValueError(f"Unknown month format: '{month_str}'")
+
+def get_merged_cell_value(ws, row: int, col: int):
     """
-    The Worker class represents an individual worker and manages their availability and salary.
+    Retorna o valor da célula principal se a (row, col) estiver dentro de uma célula mesclada.
+    Caso contrário, retorna None.
     """
+    for merged_range in ws.merged_cells.ranges:
+        min_col, min_row, max_col, max_row = range_boundaries(str(merged_range))
+        if min_row <= row <= max_row and min_col <= col <= max_col:
+            return ws.cell(row=min_row, column=min_col).value  # valor da célula principal
+    return None  # Não está em uma célula mesclada
 
-    def __init__(self, id, salary, years, perc_year, name, surname, pm_per_ap):
-        """
-        Initialize a Worker object with an ID, salary, and availability for each year.
+def extract_ap_date_ranges(filepath: str, company: str) -> List[Tuple[str, str]]:
+    wb = load_workbook(filepath, data_only=True)
+    ws = wb.active
 
-        Args:
-            id (int): The worker's ID.
-            salary (float): The worker's salary.
-            years (int): The number of years to track availability.
-        """
-        self.id = id
-        self.hours_available = np.zeros((years, 1))
-        self.salary = salary
-        self.months = np.zeros((years, 1))
-        self.hours_available_per_month = np.zeros((years, 12))
-        self.perc_year = perc_year
-        self.name = name
-        self.surname = surname
-        self.pm_per_ap = pm_per_ap
+    max_col = ws.max_column
+    max_row = ws.max_row
+    header_row_idx = 4
+    month_row_idx = 4
+    year_row_idx = 3
+    data_start_row = 6
 
-    def __lt__(self, other):
-        """
-        Compare workers based on their salaries.
+    # Find 'Summe' column
+    date_start_col = None
+    for col in range(1, max_col + 1):
+        val = ws.cell(row=header_row_idx, column=col).value
+        if val and isinstance(val, str) and "summe" in val.lower():
+            date_start_col = col + 1
+            break
+    if date_start_col is None:
+        print("❌ Could not find 'Summe' column.")
+        return []
 
-        Args:
-            other (Worker): Another Worker object.
+    # Find company column
+    company_col = None
+    for col in range(1, max_col + 1):
+        val = ws.cell(row=header_row_idx, column=col).value
+        if val and isinstance(val, str) and company.lower() in val.lower():
+            company_col = col
+            break
+    if company_col is None:
+        print(f"❌ Company '{company}' not found.")
+        return []
 
-        Returns:
-            bool: True if self's salary is greater than other's, False otherwise.
-        """
-        return self.salary > other.salary
+    # Determine comparator color
+    reference_color = ws.cell(row=data_start_row, column=date_start_col).fill.start_color.index
+    comparator_color = 8 if reference_color > 2 else 1
 
-    def discount_hours(self, discounted_hours, year):
-        """
-        Discount worked hours from the available hours for a specific year.
+    date_ranges: List[Tuple[str, str]] = []
 
-        Args:
-            discounted_hours (float): The number of hours worked to discount.
-            year (int): The year to discount hours from.
-        """
-        self.hours_available[year] = self.hours_available[year] - discounted_hours
+    for row in range(data_start_row, max_row + 1):
+        ap_id_cell = ws.cell(row=row, column=2).value
+        if not ap_id_cell or str(ap_id_cell).strip() == "":
+            continue  # skip empty rows
 
-    def is_available(self, year, month):
-        # Check if the worker is available for the given year and month
-        if self.hours_available_per_month[year, month] > 0:
-            return True
-        return False
+        # Skip whole-number IDs like 1, 2, ...
+        try:
+            if float(ap_id_cell).is_integer():
+                continue
+        except:
+            pass
 
-    def allowed_hours(self, hours_available, months):
-        """
-        Set the available hours for each year.
+        # Skip if company effort is 0 or invalid
+        try:
+            effort = float(ws.cell(row=row, column=company_col).value or 0.0)
+            if effort <= 0:
+                continue
+        except:
+            continue
 
-        Args:
-            hours_available (float): The number of available hours for each year.
-            :param hours_available:
-            :param months:
-        """
+        # Find black-filled columns (continuous block)
+        black_cols = []
+        for col in range(date_start_col, max_col + 1):
+            cell = ws.cell(row=row, column=col)
+            if cell.fill.start_color.index == comparator_color:
+                black_cols.append(col)
+            elif black_cols:
+                break  # stop after black block ends
 
-        while len(months) > len(hours_available):
-            hours_available.append([0])
+        if not black_cols:
+            continue
 
-        while len(hours_available) > len(months):
-            months.append(0)
+        first_col = black_cols[0]
+        last_col = black_cols[-1]
 
-        for index in range(self.months.shape[0]):
-            self.months[index] = months[index] / 12
+        if row == 25:
+            print("ok")
 
-        for index in range(self.hours_available.shape[0]):
-            self.hours_available[index][0] = hours_available[index] * self.months[index]
+        try:
+            month1_str = str(ws.cell(row=month_row_idx, column=first_col).value)
+            month1 = month_str_to_number(month1_str)
+            year_raw = get_merged_cell_value(ws, year_row_idx, first_col)
+            if year_raw is None:
+                raise ValueError(f"Couldn't find a year value for column {first_col}")
+            year1 = int(year_raw)
+            start_date = f"01.{month1:02d}.{year1}"
+        except:
+            start_date = None
 
-        counter = 0
-        year = 0
-        for month_in_year in months:
-            if counter == 0 & month_in_year < 12:
-                self.hours_available_per_month[year][12 - month_in_year:12] = 1
-                counter += 1
-            else:
-                self.hours_available_per_month[year][0:month_in_year] = 1
-            year += 1
+        try:
+            month2_str = str(ws.cell(row=month_row_idx, column=last_col).value)
+            month2 = month_str_to_number(month2_str)
+            year_raw = get_merged_cell_value(ws, year_row_idx, last_col)
+            if year_raw is None:
+                raise ValueError(f"Couldn't find a year value for column {last_col}")
+            year2 = int(year_raw)
+            last_day = int(monthrange(2026, month2)[1])
+            end_date = f"{last_day:02d}.{month2:02d}.{year2:02d}"
+        except Exception as e:
+            end_date = None
+            print(e)
+
+        if start_date and end_date:
+            date_ranges.append((start_date, end_date))
+
+    return date_ranges
+
+def month_per_year(df: pd.DataFrame):
+    header_row_year = df.iloc[2].copy()
+    header_row_month = df.iloc[3]
+
+    # Encontrar índice da coluna "Summe"
+    summe_col_idx = None
+    for i, val in enumerate(header_row_month):
+        if isinstance(val, str) and "summe" in val.lower():
+            summe_col_idx = i
+            break
+
+    if summe_col_idx is None:
+        raise ValueError("❌ Coluna 'Summe' não encontrada.")
+
+    # Preencher os NaNs com o último ano válido para lidar com células mescladas
+    header_row_year.iloc[summe_col_idx + 1:] = header_row_year.iloc[summe_col_idx + 1:].ffill()
+
+    months_by_year = {}
+    for col in range(summe_col_idx + 1, len(df.columns)):
+        year = header_row_year[col]
+        month = header_row_month[col]
+
+        if pd.isna(year) or pd.isna(month):
+            continue
+
+        year = str(year).strip()
+        month = str(month).strip()
+
+        if year not in months_by_year:
+            months_by_year[year] = []
+
+        months_by_year[year].append(month)
+
+    return months_by_year
 
 
-def add_to_list(workers):
-    """
-    Add a list of workers to the global list of workers.
+def is_in_project(uploaded_ap_file, company):
+    if uploaded_ap_file is None:
+        return 1
 
-    Args:
-        workers (list): A list of Worker objects.
-    """
-    for w in workers:
-        list_of_workers.append(w)
+    df = pd.read_excel(uploaded_ap_file, header=None)
+
+    header_row = df.iloc[3].astype(str).str.strip()
+
+    try:
+        company_col_idx = next(
+            i for i, col in enumerate(header_row)
+            if company.lower() in col.lower()
+        )
+    except StopIteration:
+        print(f"❌ Company '{company}' not found in the Excel header row.")
+        return []
+
+    return None
 
 
-def sorte_workers():
-    """
-    Sort the global list of workers based on their salaries.
-    """
-    list_of_workers.sort()
+
