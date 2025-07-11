@@ -10,14 +10,13 @@ import worker
 import assignments
 import html_report
 
-
 def company_in_file(uploaded_file, company: str) -> bool:
     if uploaded_file is None or not company.strip():
         return False
     try:
         df = pd.read_excel(uploaded_file, header=None)
         if df.shape[0] <= 3:
-            st.warning("🚫 Die Datei hat weniger als 4 Zeilen – Headerzeile fehlt?")
+            st.warning("\U0001F6AB Die Datei hat weniger als 4 Zeilen – Headerzeile fehlt?")
             return False
 
         header_row = df.iloc[3].astype(str).str.strip()
@@ -26,10 +25,9 @@ def company_in_file(uploaded_file, company: str) -> bool:
         st.error(f"❌ Fehler beim Verarbeiten der Datei: {e}")
         return False
 
-
 def main():
     st.set_page_config(page_title="Arbeitsplan Optimierer", layout="centered")
-    st.title("🛠️ Arbeitsplan Optimierer")
+    st.title("\U0001F6E0️ Arbeitsplan Optimierer")
 
     with st.sidebar:
         st.header("⚙️ Einstellungen")
@@ -39,7 +37,6 @@ def main():
     ap_file = st.file_uploader("📄 Arbeitsplan hochladen (Excel)", type=["xlsx"])
     worker_file = st.file_uploader("👷 Personalkosten hochladen (Excel)", type=["xlsx"])
 
-    # Validate input before allowing optimization
     valid_inputs = (
         company_name.strip() != ""
         and rounds > 0
@@ -56,8 +53,11 @@ def main():
             df_ap = pd.read_excel(ap_file, header=None)
             df_workers = pd.read_excel(worker_file)
 
-            # Preprocessing
-            aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, Filepath=ap_file.name)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp_ap_file:
+                tmp_ap_file.write(ap_file.read())
+                tmp_ap_path = tmp_ap_file.name
+
+            aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, Filepath=tmp_ap_path)
             months = worker.month_per_year(df_ap)
             workers_list_orig = worker.extract_workers_from_dataframe(df_workers, months)
             start_year = int(aps_list_orig[0].start_date[6:])
@@ -73,14 +73,12 @@ def main():
                     aps_list = copy.deepcopy(aps_list_orig)
                     workers_list = copy.deepcopy(workers_list_orig)
 
-                    # 🔀 Randomize AP order
                     original_order = {ap.id: idx for idx, ap in enumerate(aps_list)}
                     random.shuffle(aps_list)
 
                     for ap in aps_list:
                         assignments.assign_ap_to_workers(ap, workers_list, start_year)
 
-                    # ✅ Restore original AP order
                     aps_list.sort(key=lambda ap: original_order.get(ap.id, 9999))
 
                     all_distributed = all("Nicht zugewiesen" not in (ap.assigned_worker_name or "") for ap in aps_list)
@@ -122,7 +120,6 @@ def main():
                 st.error("❌ Keine gültige Lösung gefunden.")
     else:
         st.info("⬅️ Bitte Firmenname eingeben, beide Dateien hochladen und sicherstellen, dass die Firma im AP enthalten ist.")
-
 
 if __name__ == "__main__":
     main()
