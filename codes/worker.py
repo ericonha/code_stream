@@ -4,11 +4,15 @@ from dataclasses import dataclass, field
 import numpy as np
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
+
+import openpyxl
 import pandas as pd
 from openpyxl.utils import range_boundaries
 from openpyxl import load_workbook
 from calendar import monthrange
 from typing import List, Tuple, Dict
+import io
+
 
 @dataclass
 class Worker:
@@ -129,7 +133,7 @@ class WorkPackage:
               f"Start: {self.start_date or 'N/A'} | End: {self.end_date or 'N/A'} | "
               f"Worker ID: {self.assigned_worker_id or '—'} | Name: {self.assigned_worker_name or '—'}")
 
-def extract_work_packages_from_dataframe(df: pd.DataFrame, company: str, Filepath: str) -> List[WorkPackage]:
+def extract_work_packages_from_dataframe(df: pd.DataFrame, company: str, file_buffer: str) -> List[WorkPackage]:
     aps: List[WorkPackage] = []
 
     header_row = df.iloc[3].astype(str).str.strip()
@@ -143,7 +147,8 @@ def extract_work_packages_from_dataframe(df: pd.DataFrame, company: str, Filepat
         print(f"❌ Company '{company}' not found in the Excel header row.")
         return []
 
-    month_col_map = extract_ap_date_ranges(Filepath,company)
+    # ✅ Use the buffer to extract month start/end
+    month_col_map = extract_ap_date_ranges(file_buffer, company)
     index_ap = 0
 
     for _, row in df.iloc[4:].iterrows():
@@ -154,7 +159,7 @@ def extract_work_packages_from_dataframe(df: pd.DataFrame, company: str, Filepat
 
         ap_id_str = str(ap_id_raw).strip()
 
-        if len(month_col_map)==index_ap :
+        if len(month_col_map) == index_ap:
             break
 
         try:
@@ -221,8 +226,8 @@ def get_merged_cell_value(ws, row: int, col: int):
             return ws.cell(row=min_row, column=min_col).value  # valor da célula principal
     return None  # Não está em uma célula mesclada
 
-def extract_ap_date_ranges(filepath: str, company: str) -> List[Tuple[str, str]]:
-    wb = load_workbook(filepath, data_only=True)
+def extract_ap_date_ranges(filename: str, company: str) -> List[Tuple[str, str]]:
+    wb = openpyxl.load_workbook(filename, data_only=True)
     ws = wb.active
 
     max_col = ws.max_column
@@ -362,7 +367,6 @@ def month_per_year(df: pd.DataFrame):
 
     return months_by_year
 
-
 def is_in_project(uploaded_ap_file, company):
     if uploaded_ap_file is None:
         return 1
@@ -381,5 +385,3 @@ def is_in_project(uploaded_ap_file, company):
         return []
 
     return None
-
-
