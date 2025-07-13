@@ -51,10 +51,13 @@ def main():
 
     if valid_inputs:
         if st.button("🚀 Optimierung starten"):
+            ap_bytes = ap_file.read()
+            ap_buffer = io.BytesIO(ap_bytes)
+
             df_ap = pd.read_excel(ap_file, header=None)
             df_workers = pd.read_excel(worker_file)
 
-            aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, Filepath=ap_file.name)
+            aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, file_buffer=ap_file)
             months = worker.month_per_year(df_ap)
             workers_list_orig = worker.extract_workers_from_dataframe(df_workers, months)
             start_year = int(aps_list_orig[0].start_date[6:])
