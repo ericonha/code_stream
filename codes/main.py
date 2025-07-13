@@ -96,7 +96,7 @@ def main():
                         best_workers_list = copy.deepcopy(workers_list)
 
             if best_aps_list:
-                st.success(f"✅ Beste Lösung gefunden ({successful_runs} von {rounds} erfolgreich).")
+                st.success(f"✅ Beste Lösung erfolgreich gefunden")
 
                 # Create in-memory PDF buffers
                 ap_pdf_buffer = io.BytesIO()
