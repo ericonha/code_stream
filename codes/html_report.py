@@ -34,8 +34,7 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
                     <th>Startdatum</th>
                     <th>Enddatum</th>
                     <th>Arbeiter-ID</th>
-                    <th>Arbeiter-Name</th>
-                    <th>WH</th>
+                    <th>PM</th>
                 </tr>
             </thead>
             <tbody>
@@ -63,7 +62,6 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
                     <td>{ap.start_date}</td>
                     <td>{ap.end_date}</td>
                     <td>{wid}</td>
-                    <td>{name}</td>
                     <td>{round(partial_pm,3):.2f}</td>
                 </tr>
                 """
@@ -134,8 +132,8 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
                 <tr>
                     <th>Projektkosten (€)</th>
                     <th>Anzahl APs</th>
-                    <th>Gesamt WH</th>
-                    <th style="color:red;">WH Nicht Zugewiesen</th>
+                    <th>Gesamt PM</th>
+                    <th style="color:red;">PM Nicht Zugewiesen</th>
                 </tr>
             </thead>
             <tbody>
