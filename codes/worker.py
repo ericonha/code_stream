@@ -1,17 +1,18 @@
 # models/worker.py
-import math
 from dataclasses import dataclass, field
 import numpy as np
 from dataclasses import dataclass
-from typing import Optional, List, Tuple
-
+from typing import Optional, List, Tuple, Union, Any
 import openpyxl
 import pandas as pd
 from openpyxl.utils import range_boundaries
 from openpyxl import load_workbook
 from calendar import monthrange
 from typing import List, Tuple, Dict
-import io
+import math
+
+from typing import Dict, Optional
+import pandas as pd
 
 
 @dataclass
@@ -192,6 +193,112 @@ def extract_work_packages_from_dataframe(df: pd.DataFrame, company: str, file_bu
         aps.append(ap)
 
     return aps
+
+from typing import List, Dict, Any
+import pandas as pd
+
+
+from typing import Dict, Optional
+import pandas as pd
+import re
+
+def extract_fix_workers_column_values(df: pd.DataFrame, search_company: str, company: str) -> Dict[str, Optional[str]]:
+    result: Dict[str, Optional[str]] = {}
+
+    header_row = df.iloc[3].astype(str).str.strip()
+
+    try:
+        company_col_idx = next(
+            i for i, col in enumerate(header_row)
+            if search_company.lower() in col.lower()
+        )
+    except StopIteration:
+        print(f"❌ Company '{search_company}' not found in the Excel header row.")
+        return {}
+
+    for i in range(4, len(df)):
+        first_col_raw = df.iat[i, 1]
+
+        # Stop when reaching summary line
+        if isinstance(first_col_raw, str) and "summe der personalmonate" in first_col_raw.lower():
+            break
+
+        # Skip empty or whole-number lines
+        if pd.isna(first_col_raw) or (isinstance(first_col_raw, str) and first_col_raw.strip() == ""):
+            continue
+        try:
+            num = float(first_col_raw)
+            if num.is_integer():
+                continue
+        except (ValueError, TypeError):
+            pass
+
+        ap_id = str(first_col_raw).strip()
+        cell_value = df.iat[i, company_col_idx]
+
+        if pd.isna(cell_value) or str(cell_value).strip() == "":
+            result[ap_id] = None
+            continue
+
+        cell_text = str(cell_value).strip()
+
+        # Find all worker entries like "M&S (1)"
+        matches = re.findall(r"([^\(,]+)\((\d+)\)", cell_text)
+
+        # Filter: only keep the string if at least one entry matches the current company
+        company_in_cell = any(company.lower() in name.strip().lower() for name, _ in matches)
+
+        if company_in_cell:
+            result[ap_id] = cell_text
+        else:
+            result[ap_id] = None  # ignore assignments for other companies
+
+    return result
+
+
+import re
+
+import re
+from typing import List, Dict, Optional
+
+def apply_fixed_worker_assignments(
+    aps_list: List[WorkPackage],
+    fix_worker_dict: Dict[str, Optional[str]],
+    company: str,
+    workers_list: List
+) -> None:
+    """
+    For each WorkPackage, if its `id` exists in `fix_worker_dict` and has a fixed worker string,
+    assign the corresponding worker name and ID.
+    """
+    if not company or not fix_worker_dict:
+        return
+
+    # Create a mapping from worker ID to worker
+    worker_id_map = {w.id: w for w in workers_list}
+
+    for ap in aps_list:
+        fixed_value = fix_worker_dict.get(ap.id)
+
+        if fixed_value and isinstance(fixed_value, str):
+            # Extract first worker from string, e.g. "M&S (1)" or "Felipe (2)"
+            companies = fixed_value.split(",")
+            for fixed_value in companies:
+                match = re.search(r"([^\(]+)\((\d+)\)", fixed_value)
+                if match:
+                    name_str, worker_id_str = match.groups()
+                    worker_id = int(worker_id_str)
+
+                    if name_str.strip()!=company:
+                        continue
+
+                    ap.assigned_worker_name = workers_list[worker_id-1].name
+                    ap.assigned_worker_id = worker_id
+
+
+                    # Optionally warn if the worker ID doesn't exist
+                    if worker_id not in worker_id_map:
+                        print(f"⚠️ Worker ID {worker_id} not found in workers list for AP {ap.id}")
 
 MONTH_MAP = {
     "jan": 1, "januar": 1,
