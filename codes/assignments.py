@@ -2,6 +2,7 @@ from dateutil.relativedelta import relativedelta
 import datetime
 from typing import List
 from worker import WorkPackage, Worker
+from typing import Optional, Dict
 import math
 round_num = 4
 
@@ -26,6 +27,12 @@ def step_per_month(h_per_month, months, required_pm, step):
 def assign_ap_to_workers(work_package: WorkPackage, workers: List[Worker], start_year: int):
     if math.isnan(work_package.required_pm):
         return None
+
+    if work_package.assigned_worker_id is not None:
+        result = assign_to_fixed_worker(work_package, workers, start_year)
+        if result is not None:
+            return result  # fixed assignment complete
+
     required_pm = work_package.required_pm
     assignment = {}
     start_dt = datetime.datetime.strptime(work_package.start_date, "%d.%m.%Y")
@@ -149,5 +156,69 @@ def assign_ap_to_workers(work_package: WorkPackage, workers: List[Worker], start
                 work_package.assigned_worker_name = "Nicht zugewiesen"
         if 0 not in work_package.assigned_worker_ids:
             work_package.assigned_worker_ids.append(0)
+
+    return assignment
+
+def assign_to_fixed_worker(
+    work_package: WorkPackage,
+    workers: List[Worker],
+    start_year: int,
+    round_num: int = 2
+) -> Optional[Dict[tuple, float]]:
+    """
+    Assigns the work_package to a fixed worker if `assigned_worker_id` is set.
+    Updates the worker's availability and logs, and returns the assignment dict.
+    If no fixed worker is assigned or found, returns None.
+    """
+
+    if work_package.assigned_worker_id is None:
+        return None
+
+    # Find worker with matching ID
+    worker = next((w for w in workers if w.id == work_package.assigned_worker_id), None)
+    if worker is None:
+        print(f"⚠️ Worker ID {work_package.assigned_worker_id} not found.")
+        return None
+
+    try:
+        start_dt = datetime.datetime.strptime(work_package.start_date, "%d.%m.%Y")
+        end_dt = datetime.datetime.strptime(work_package.end_date, "%d.%m.%Y")
+    except Exception as e:
+        print(f"❌ Invalid date in WorkPackage {work_package.id}: {e}")
+        return None
+
+    # Build list of months
+    months = []
+    current_dt = start_dt
+    while current_dt <= end_dt:
+        months.append(current_dt)
+        current_dt += relativedelta(months=1)
+
+    required_pm = work_package.required_pm
+    pm_per_month = round(required_pm / len(months), round_num)
+    assignment = {}
+
+    for dt in months:
+        year_idx = dt.year - start_year
+        month_idx = dt.month - 1
+
+        key = (worker.id, year_idx, month_idx)
+        assignment[key] = assignment.get(key, 0.0) + pm_per_month
+
+        # Update worker's availability
+        worker.hours_available_per_month[year_idx][month_idx] -= pm_per_month
+        worker.summed_hours_worked_per_year[year_idx] += pm_per_month
+        worker.summed_hours_worked_total += pm_per_month
+
+        # Update logs
+        worker.assignment_log.setdefault((year_idx, month_idx), []).append((work_package.id, pm_per_month))
+        worker.assignment_log_hours_per_ap[work_package.id] = (
+            worker.assignment_log_hours_per_ap.get(work_package.id, 0.0) + pm_per_month
+        )
+
+    # Update work package assignment list
+    work_package.assigned_worker_ids = [worker.id]
+    if not work_package.assigned_worker_name:
+        work_package.assigned_worker_name = f"{worker.name} {worker.surname}"
 
     return assignment
