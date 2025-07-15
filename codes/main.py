@@ -59,8 +59,10 @@ def main():
 
             aps_list_orig = worker.extract_work_packages_from_dataframe(df_ap, company=company_name, file_buffer=ap_file)
             months = worker.month_per_year(df_ap)
+            fix_workers = worker.extract_fix_workers_column_values(df_ap, "Auft",company=company_name)
             workers_list_orig = worker.extract_workers_from_dataframe(df_workers, months)
             start_year = int(aps_list_orig[0].start_date[6:])
+            worker.apply_fixed_worker_assignments(aps_list_orig, fix_workers, company_name, workers_list_orig)
 
             best_aps_list = None
             best_workers_list = None
@@ -96,7 +98,7 @@ def main():
                         best_workers_list = copy.deepcopy(workers_list)
 
             if best_aps_list:
-                st.success(f"✅ Beste Lösung erfolgreich gefunden")
+                st.success(f"✅ Beste Lösung gefunden ({successful_runs} von {rounds} erfolgreich).")
 
                 # Create in-memory PDF buffers
                 ap_pdf_buffer = io.BytesIO()
@@ -124,3 +126,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
