@@ -79,7 +79,6 @@ def generate_full_html_report(aps_list: List[WorkPackage], workers_list: List[Wo
                 <td>{ap.start_date}</td>
                 <td>{ap.end_date}</td>
                 <td>{wid}</td>
-                <td>{name}</td>
                 <td>{ap.required_pm:.2f}</td>
             </tr>
             """
